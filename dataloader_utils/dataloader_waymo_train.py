@@ -96,7 +96,7 @@ class WaymoE2EDatasetTraining(Dataset):
         next_state_traj = np.array(next_state_traj)
         past_state_traj = np.array(past_state_traj)
         np.set_printoptions(precision=4, suppress=True)
-        prompt_to_use = "Describe the image"#training_prompt(np.array_str(past_state_traj), Intent_String)
+        prompt_to_use = training_prompt(np.array_str(past_state_traj), Intent_String)
         indices = [0, 3, 7, 11, 15, 19]
         next_state_traj_5 = next_state_traj[indices]
         message_to_pass = [{
@@ -113,3 +113,13 @@ class WaymoE2EDatasetTraining(Dataset):
         ]
 
         return front_image_list, rear_image_list, next_state_traj, past_state_traj, Intent_String, message_to_pass
+
+def my_collate_fn(batch):
+  front_images = [torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
+  rear_image = [torch.from_numpy(el[1]).permute(0,3,1,2) for el in batch]
+  next_state_traj = [el[2] for el in batch]
+  past_state_traj = [el[3] for el in batch]
+  intent_traj = [el[4] for el in batch]
+  messages = [el[5] for el in batch]
+  batch_process = [front_images, rear_image, next_state_traj, past_state_traj, intent_traj, messages]
+  return batch_process
