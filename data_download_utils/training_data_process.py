@@ -13,15 +13,17 @@ TEST_FILES = os.path.join(DATASET_FOLDER, 'test_*.tfrecord*')
 
 SAVE_LOCATION = "/cluster/scratch/arsood/data_new" #Put the location of where to save the processed data
 
-CREATE_DIRECTORY = 1
 
 name_folders_train = np.load('training_segments.npy')
 name_folders_val = np.load('val_segments.npy')
+
 name_folders = name_folders_train #Choose if using name_folders_train or name_folders_val
+filenames = tf.io.matching_files(VALIDATION_FILES) #Choose beetween TRAIN_FILES, VALIDATION_FILES, TEST_FILES
+
+
 for el in name_folders:
     os.makedirs(os.path.join(SAVE_LOCATION, el), exist_ok=True)
 
-filenames = tf.io.matching_files(VALIDATION_FILES) #Choose beetween TRAIN_FILES, VALIDATION_FILES, TEST_FILES
 dataset = tf.data.TFRecordDataset(filenames, compression_type='')
 dataset_iter = dataset.as_numpy_iterator()
 
