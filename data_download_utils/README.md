@@ -25,7 +25,7 @@ mkdir -p waymo_data/validation
 
 ```bash
 cd waymo_data/training
-gsutil -m cp -r gs://waymo_open_dataset_end_to_end_camera_v_1_0_0/training_*.tfrecord* training/
+gsutil -m cp -r gs://waymo_open_dataset_end_to_end_camera_v_1_0_0/training_*.tfrecord* .
 ```
 
 ---
@@ -34,7 +34,7 @@ gsutil -m cp -r gs://waymo_open_dataset_end_to_end_camera_v_1_0_0/training_*.tfr
 
 ```bash
 cd waymo_data/validation
-gsutil -m cp -r gs://waymo_open_dataset_end_to_end_camera_v_1_0_0/val*.tfrecord* validation/
+gsutil -m cp -r gs://waymo_open_dataset_end_to_end_camera_v_1_0_0/val*.tfrecord* .
 ```
 ---
 
