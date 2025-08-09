@@ -6,7 +6,7 @@ import random
 import numpy as np
 import tensorflow as tf
 import cv2
-from strings import training_prompt
+from .strings import training_prompt
 
 
 def return_front3_cameras(data: wod_e2ed_pb2.E2EDFrame):
@@ -114,7 +114,7 @@ class WaymoE2EDatasetTraining(Dataset):
 
         return front_image_list, rear_image_list, next_state_traj, past_state_traj, Intent_String, message_to_pass
 
-def my_collate_fn(batch):
+def train_collate_fn(batch):
   front_images = [torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
   rear_image = [torch.from_numpy(el[1]).permute(0,3,1,2) for el in batch]
   next_state_traj = [el[2] for el in batch]

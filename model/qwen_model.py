@@ -8,7 +8,7 @@ from qwen_vl_utils import process_vision_info
 from peft import LoraConfig, get_peft_model
 
 class QwenModel():
-    def __init__(self, cache_dir = '/cluster/scratch/arsood/cache_hugging_face', local_files_only= True, model_to_use = 7, device = 'auto'):
+    def __init__(self, cache_dir = '/cluster/scratch/arsood/cache_hugging_face', local_files_only= True, model_to_use = 7, device = 'cuda'):
         model_dict = {
            3: "Qwen/Qwen2.5-VL-3B-Instruct",
            7: "Qwen/Qwen2.5-VL-7B-Instruct",
