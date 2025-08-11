@@ -13,7 +13,7 @@ class QwenModel():
            3: "Qwen/Qwen2.5-VL-3B-Instruct",
            7: "Qwen/Qwen2.5-VL-7B-Instruct",
            32: "Qwen/Qwen2.5-VL-32B-Instruct",
-           70: "Qwen/Qwen2.5-VL-70B-Instruct"
+           72: "Qwen/Qwen2.5-VL-72B-Instruct"
         }
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model_dict[model_to_use], torch_dtype=torch.float16, device_map=device,
