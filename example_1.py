@@ -11,7 +11,7 @@ model = QwenModel(model_to_use=72, device='auto')
 # training_loader = DataLoader(training_dataset, batch_size=1, shuffle=False, collate_fn=train_collate_fn)
 dir_to_save = '/cluster/scratch/arsood/data_strings_train'
 
-index_arr = [3, 5, 7, 9, 11, 13, 15, 18, 17]
+index_arr = [6, 8, 10, 12, 14, 16, 19, 20, 21]
 batch_size_n = 8
 for index_el in index_arr:
 

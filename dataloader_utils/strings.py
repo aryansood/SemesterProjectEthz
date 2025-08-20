@@ -1,33 +1,96 @@
-def training_prompt(traj_past, intent):
+def training_prompt(traj_past, intent, traj_fut):
 
+    # prompt_to_pass = """
+    # You are an expert Driver.
+    # - You will see a set of past 4 frames each made of the front 5 cameras merged togheter to form a front panoramic view.
+    # - You are given the past 4 second trajectory here as array [[x1,y1], [x2, y2], ..., [x16, y16]].
+    # Here is the past 4 second trajectory: """+traj_past+"""
+    # - You are also given the high level intent from the navigator : """+intent+"""
+    # - The objective for you is to undestand the scene you are in and predidct the next 5 second trajectory to avoid hazards you will encounter on the road.
+    # - You have to pay attention on nearby confltting vehicle(are there on the any? are there on the front? on the left ? on the rigth? are they going to a be hazard? Do you have to adjust future trajectory either to the right or the left to avoid them?)
+    # - You have to pay attention on nearby pedestrian(are there on the any? are there on the front? on the left ? on the rigth? are they going to a be hazard?Do you have to adjust future trajectory either to the right or the left to avoid them?)
+    # - You have to pay attention to line roads(The next trajectory is it inside the line?)
+    # - You have to pay attention to cyclist(are there on the any? are there on the front? on the left ? on the rigth? are they going to a be hazard?Do you have to adjust future trajectory either to the right or the left to avoid them?)
+    # - You have to pay attention to aniamls(are there on the any? are there on the front? on the left ? on the rigth? are they going to a be hazard?Do you have to adjust future trajectory either to the right or the left to avoid them?)
+    # - You have to pay attention to door_opening_vehicle(are there on the any? the left ? on the rigth? are they going to a be hazard?Do you have to adjust future trajectory either to the right or the left to avoid them?)
+    # - You have to pay attention to weather_condition(are there any problematic weather condition? can you mantain speed?or do you have to decelaaret)
+    # - You have to pay attention to construction site and elements(are there any construction elelnts you have to avoid? Do you have to adjust your speed? Do you have to adjust future trajectory either to the right or the left to avoid them?)
+    # - Can you accelerate? can the the next rajectory matain same speed? Are there any traffic ligths or sign where you have to stop?.
+    # You have to output the future trajectory sampled at 1HZ for the next 5 seconds, Starting at 0.25 so you actually output 6 waypoint.
+    # Output Format:
+    # {
+    # [x0,y0], [x1, y1], [x2, y2], [x3, y3], [x4, y4], [x5, y5]
+    # }
+    # You have to substitute x0,y0,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5 with appropriate numerical values for obtaining the optimal next 5 seconds trajectory, considering all the elements in the scene.
+    # Please the output format should be:
+    # {
+    # [x0,y0], [x1, y1], [x2, y2], [x3, y3], [x4, y4], [x5, y5]
+    # }
+    # JUST OUTPUT THE NUMERICAL TRAJECTORY AS TOLD
+    # """
     prompt_to_pass = """
-    You are an expert Driver.
-    - You will see a set of past 4 frames each made of the front 5 cameras merged togheter to form a front panoramic view.
-    - You are given the past 4 second trajectory here as array [[x1,y1], [x2, y2], ..., [x16, y16]].
-    Here is the past 4 second trajectory: """+traj_past+"""
-    - You are also given the high level intent from the navigator : """+intent+"""
-    - The objective for you is to undestand the scene you are in and predidct the next 5 second trajectory to avoid hazards you will encounter on the road.
-    - You have to pay attention on nearby confltting vehicle(are there on the any? are there on the front? on the left ? on the rigth? are they going to a be hazard? Do you have to adjust future trajectory either to the right or the left to avoid them?)
-    - You have to pay attention on nearby pedestrian(are there on the any? are there on the front? on the left ? on the rigth? are they going to a be hazard?Do you have to adjust future trajectory either to the right or the left to avoid them?)
-    - You have to pay attention to line roads(The next trajectory is it inside the line?)
-    - You have to pay attention to cyclist(are there on the any? are there on the front? on the left ? on the rigth? are they going to a be hazard?Do you have to adjust future trajectory either to the right or the left to avoid them?)
-    - You have to pay attention to aniamls(are there on the any? are there on the front? on the left ? on the rigth? are they going to a be hazard?Do you have to adjust future trajectory either to the right or the left to avoid them?)
-    - You have to pay attention to door_opening_vehicle(are there on the any? the left ? on the rigth? are they going to a be hazard?Do you have to adjust future trajectory either to the right or the left to avoid them?)
-    - You have to pay attention to weather_condition(are there any problematic weather condition? can you mantain speed?or do you have to decelaaret)
-    - You have to pay attention to construction site and elements(are there any construction elelnts you have to avoid? Do you have to adjust your speed? Do you have to adjust future trajectory either to the right or the left to avoid them?)
-    - Can you accelerate? can the the next rajectory matain same speed? Are there any traffic ligths or sign where you have to stop?.
-    You have to output the future trajectory sampled at 1HZ for the next 5 seconds, Starting at 0.25 so you actually output 6 waypoint.
-    Output Format:
+    You are an expert labeller of driving scenarios.
+    Input:
+    - 4 frames of multi-view images collected from the ego-vehicle over the last second
+    - Current high-level intent """+intent+"""
+    - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
+    - Expert 5-second future trajectory (20 steps at 4 Hz)"""+traj_fut+"""
+    Task:
+    1. Inspect the input and decide, for each object class below, whether at least one critical
+    instance of that class is present (i.e., it materially affects the ego-vehicle’s future trajectory
+    ). A vehicle can be a car, bus, truck, motorcyclist, scooter, etc. traffic_element includes
+    traffic signs and traffic lights. road_hazard may include hazardous road conditions, road debris,
+    obstacles, etc. A conflicting_vehicle is a vehicle that may potentially conflict with the ego’s
+    future path.
+    Object classes to audit:
+    - nearby_vehicle
+    - pedestrian
+    - cyclist
+    - construction
+    - traffic_element
+    - weather_condition
+    - road_hazard
+    - emergency_vehicle
+    - animal
+    - special_vehicle
+    - conflicting_vehicle
+    - door_opening_vehicle
+    2. Output "yes" or "no" for every class (no omissions).
+    3. Compose a concise natural-language description explaining why the expert safe driver plans the
+    given future trajectory.
+    - Mention only the classes you marked "yes"
+    - Describe how each of those critical objects or conditions influences the trajectory.
+    - Do not invent objects or conditions not present in the input.
+    4. From the expert’s 5-second future trajectory, assign exactly one category from each list:
+    - speed ∈ { keep, accelerate, decelerate }
+    - command ∈ { straight, yield, left_turn, right_turn, lane_follow, lane_change_left,
+    lane_change_right, reverse }
+    Choose the label that best summarises the overall behaviour of the expert future trajectory.
+    - If none fits, use ‘other‘, but do this sparingly.
+    Output format (strict JSON, no extra keys, no commentary):
     {
-    [x0,y0], [x1, y1], [x2, y2], [x3, y3], [x4, y4], [x5, y5]
-    }
-    You have to substitute x0,y0,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5 with appropriate numerical values for obtaining the optimal next 5 seconds trajectory, considering all the elements in the scene.
-    Please the output format should be:
-    {
-    [x0,y0], [x1, y1], [x2, y2], [x3, y3], [x4, y4], [x5, y5]
-    }
-    JUST OUTPUT THE NUMERICAL TRAJECTORY AS TOLD
+    "critical_objects": {
+    "nearby_vehicle": "yes | no",
+    "pedestrian": "yes | no",
+    "cyclist": "yes | no",
+    "construction": "yes | no",
+    "traffic_element": "yes | no",
+    "weather_condition": "yes | no",
+    "road_hazard": "yes | no",
+    "emergency_vehicle": "yes | no",
+    "animal": "yes | no",
+    "special_vehicle": "yes | no",
+    "conflicting_vehicle": "yes | no",
+    "door_opening_vehicle": "yes | no"
+    },
+    "explanation": "100-word description that references only the classes marked ’yes’",
+    "meta_behaviour": {
+    "speed": "keep | accelerate | decelerate | other",
+    "command": "straight | yield | left_turn | right_turn | lane_follow | lane_change_left |
+    lane_change_right | reverse | other"}}
     """
+
+    
     return prompt_to_pass
 
 

@@ -40,7 +40,7 @@ def return_rear3_cameras(data: wod_e2ed_pb2.E2EDFrame):
   return image_list, calibration_list
 
 class WaymoE2EDatasetTraining(Dataset):
-    def __init__(self, data_path, seq_len, draw_traj = False):
+    def __init__(self, data_path, seq_len, self_cur_idx = 10, draw_traj = False):
         super().__init__()
         self.data_path = data_path
         self.dir_list = os.listdir(data_path)
@@ -52,6 +52,8 @@ class WaymoE2EDatasetTraining(Dataset):
            2: "GO_LEFT",
            3: "GO_RIGHT"
         }
+        self.self_cur_idx = self_cur_idx
+        self.conta = 0
 
     def __len__(self):
         return len(self.dir_list) 
@@ -61,16 +63,24 @@ class WaymoE2EDatasetTraining(Dataset):
         data_point_path = os.path.join(self.data_path, data_point_name)
         filenames = os.listdir(data_point_path)
         sorted_filenames = sorted(filenames)
-        interval = random.randint(0, len(sorted_filenames)-self.seq_len)
+
+        interval = self.self_cur_idx*10#int(len(sorted_filenames)/2)#random.randint(0, len(sorted_filenames)-self.seq_len)
+        interval = random.randint(interval, interval+10-self.seq_len)
+        if(interval >= len(sorted_filenames)-10):
+           interval = len(sorted_filenames)-self.seq_len-10
+                
         past_state_traj = None
         next_state_traj = None
         front_image_list = []
         rear_image_list = []
         Intent_String = ""
-        resize_factor = 10
+        resize_factor = 5
+
+        last_file_name = ""
 
         for el in range(interval, interval+self.seq_len):
             filepath = os.path.join(data_point_path, sorted_filenames[el])
+            last_file_name = sorted_filenames[el]
             with open(filepath, 'rb') as file:
                 data_bin = file.read()
                 data = wod_e2ed_pb2.E2EDFrame()
@@ -96,9 +106,9 @@ class WaymoE2EDatasetTraining(Dataset):
         next_state_traj = np.array(next_state_traj)
         past_state_traj = np.array(past_state_traj)
         np.set_printoptions(precision=4, suppress=True)
-        prompt_to_use = training_prompt(np.array_str(past_state_traj), Intent_String)
+        prompt_to_use = training_prompt(np.array_str(past_state_traj), Intent_String, np.array_str(next_state_traj))
         indices = [0, 3, 7, 11, 15, 19]
-        next_state_traj_5 = next_state_traj[indices]
+        #next_state_traj_5 = next_state_traj[indices]
         message_to_pass = [{
         "role": "user",
         "content": [
@@ -112,14 +122,16 @@ class WaymoE2EDatasetTraining(Dataset):
         # }
         ]
 
-        return front_image_list, rear_image_list, next_state_traj, past_state_traj, Intent_String, message_to_pass
+        return front_image_list, rear_image_list, next_state_traj, past_state_traj, Intent_String, message_to_pass, last_file_name, data_point_name
 
 def train_collate_fn(batch):
-  front_images = [torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
-  rear_image = [torch.from_numpy(el[1]).permute(0,3,1,2) for el in batch]
+  front_images =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
+  rear_image =[torch.from_numpy(el[1]).permute(0,3,1,2) for el in batch]
   next_state_traj = [el[2] for el in batch]
   past_state_traj = [el[3] for el in batch]
   intent_traj = [el[4] for el in batch]
   messages = [el[5] for el in batch]
-  batch_process = [front_images, rear_image, next_state_traj, past_state_traj, intent_traj, messages]
+  filenames = [el[6] for el in batch]
+  dir_name = [el[7] for el in batch]
+  batch_process = [front_images, rear_image, next_state_traj, past_state_traj, intent_traj, messages, filenames, dir_name]
   return batch_process
