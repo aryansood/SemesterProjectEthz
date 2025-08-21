@@ -7,8 +7,6 @@ import os
 import numpy as np
 
 model = QwenModel(model_to_use=72, device='auto')
-# training_dataset = WaymoE2EDatasetTraining('/cluster/scratch/arsood/data_clean', 4)
-# training_loader = DataLoader(training_dataset, batch_size=1, shuffle=False, collate_fn=train_collate_fn)
 dir_to_save = '/cluster/scratch/arsood/data_strings_train'
 
 index_arr = [6, 8, 10, 12, 14, 16, 19, 20, 21]
