@@ -24,7 +24,7 @@ make_dir = '/cluster/scratch/arsood/covla_string'
 model = QwenModel(model_to_use=72, device='auto')
 dir_to_save = '/cluster/scratch/arsood/covla_string'
 
-index_arr = [0, 1, 2, 3, 4]
+index_arr = [9]
 batch_size_n = 8
 for index_el in index_arr:
 

@@ -65,9 +65,9 @@ def training_prompt(traj_past, intent, traj_fut):
 
 def training_prompt_covla(traj_past, intent, traj_fut):
     prompt_to_pass = """
-    You are an expert labeller of driving scenarios.
+    You are an expert labeller of left-hand-side driving scenarios.
     Input:
-    - 4 frames of multi-view images collected from the ego-vehicle over the last second
+    - 4 frames of front-view images images collected from the ego-vehicle over the last second
     - Current high-level intent """+intent+"""
     - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
     - Expert 5-second future trajectory (20 steps at 4 Hz)"""+traj_fut+"""

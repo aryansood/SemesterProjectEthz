@@ -64,7 +64,7 @@ class WaymoE2EDatasetTraining(Dataset):
         filenames = os.listdir(data_point_path)
         sorted_filenames = sorted(filenames)
 
-        interval = self.self_cur_idx*10#int(len(sorted_filenames)/2)#random.randint(0, len(sorted_filenames)-self.seq_len)
+        interval = self.self_cur_idx*10
         interval = random.randint(interval, interval+10-self.seq_len)
         if(interval >= len(sorted_filenames)-10):
            interval = len(sorted_filenames)-self.seq_len-10
