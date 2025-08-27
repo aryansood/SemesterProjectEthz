@@ -7,11 +7,14 @@ class DataCovla:
     covla_annotation: str = ""
     
 @dataclass
-class DataWaymo:
+class DataTrainWaymo:
     waymo_data: str = ""
     waymo_annotation: str = ""
 
-
+@dataclass
+class DataValWaymo:
+    waymo_data: str = ""
+    waymo_annotation: str = ""
 
 data_covla = DataCovla(
     covla_video="/cluster/scratch/arsood/covla/videos",
@@ -19,7 +22,11 @@ data_covla = DataCovla(
     covla_annotation="/cluster/scratch/arsood/covla_string"
 )
 
-data_waymo = DataWaymo(
+data_waymo_train = DataTrainWaymo(
     waymo_data="/cluster/scratch/arsood/data_clean",
     waymo_annotation="/cluster/scratch/arsood/data_strings_train"
+)
+
+data_waymo_val = DataValWaymo(
+    waymo_data="/cluster/scratch/arsood/data_val_clean",
 )

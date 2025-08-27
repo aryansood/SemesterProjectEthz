@@ -11,12 +11,8 @@ import random
 from scipy.interpolate import CubicSpline
 import math
 
-
-
 import matplotlib.pyplot as plt
 import numpy as np
-
-
 
 class CovlaDatasetTraining(Dataset):
     def __init__(self, data_path_videos, data_path_states, indices, seq_len = 4, self_cur_idx = 7):

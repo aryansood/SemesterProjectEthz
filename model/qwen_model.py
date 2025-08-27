@@ -29,8 +29,8 @@ class QwenModel():
     def generate(self, messages, images, videos):
         """
         messages: List of messages-> Depends on the batch
-        images: List of Images-> Put all the Images in the order the appear
-        videos: List of Videos-> Put all the Videos in the order the appear
+        images: List of Images-> Put all the Images in the order they appear
+        videos: List of Videos-> Put all the Videos in the order they appear
         """
         self.processor.tokenizer.padding_side = "left"
         texts = [

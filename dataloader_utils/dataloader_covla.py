@@ -18,18 +18,18 @@ import matplotlib.pyplot as plt
 def train_collate_covla_fn(batch):
   front_images =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
   messages = [el[1] for el in batch]
-  dirname = [el[2] for el in batch]
-  filenames = [el[3] for el in batch]
-  batch_process = [front_images, messages, dirname, filenames]
+  past_traj = [el[2] for el in batch]
+  fut_traj = [el[3] for el in batch]
+  batch_process = [front_images, messages, past_traj, fut_traj]
   return batch_process
 
 
 def return_objects(start_point, file_path_video, file_path_states):
-    resize_factor = 3
+    resize_factor = 4
     video_array = iio.imread(file_path_video, index=None)
 
     states_array = []
-    intent_traj = "GO_STRAIGHT"
+    driving_intent = "GO_STRAIGHT"
     with open(file_path_states, 'r') as f:
         for line in f:
             if line.strip():
@@ -95,149 +95,14 @@ def return_objects(start_point, file_path_video, file_path_states):
     # plt.savefig('/cluster/home/arsood/Semester_Project_Official/fig_2.png')
     
     if(states_array[start_point][str(start_point)]['rightBlinker'] == True):
-        intent_traj = 'GO_RIGHT'
+        driving_intent = 'GO_RIGHT'
     elif (states_array[start_point][str(start_point)]['leftBlinker'] == True):
-        intent_traj = 'GO_LEFT'
+        driving_intent = 'GO_LEFT'
     
-    return video_array_resize, intent_traj, transform_points_past, transform_points
-
-
-
-class CovlaDatasetTraining(Dataset):
-    def __init__(self, data_path_videos, data_path_states, indices, seq_len = 4, self_cur_idx = 7):
-        super().__init__()
-        self.data_path_videos = data_path_videos
-        self.list_videos = os.listdir(self.data_path_videos)
-        self.list_videos = sorted(self.list_videos)
-
-        self.data_path_states = data_path_states
-        self.list_states = os.listdir(self.data_path_states)
-        self.list_states = sorted(self.list_states)
-
-        self.list_videos = [self.list_videos[idx] for idx in indices]
-        self.list_states = [self.list_states[idx] for idx in indices]
-
-        self.window = 40
-        self.seq_len = seq_len
-        self.self_cur_idx = self_cur_idx
-
-    def __len__(self):
-        return len(self.list_states)
-    
-    def __getitem__(self, index):
-        file_path_video = os.path.join(self.data_path_videos, self.list_videos[index])
-        file_path_states = os.path.join(self.data_path_states, self.list_states[index])
-        resize_factor = 4
-
-        path_name = os.path.splitext(self.list_videos[index])[0]
-
-        interval = 80+self.window*self.self_cur_idx
-        candidate_interval = list(range(interval, interval+40, 2))
-        start_point = random.choice(candidate_interval)
-
-        video_array = iio.imread(file_path_video, index=None)
-        states_array = []
-        intent_traj = "GO_STRAIGHT"
-        with open(file_path_states, 'r') as f:
-            for line in f:
-                if line.strip():
-                    states_array.append(json.loads(line))
-
-        trajectory = np.array(states_array[start_point][str(start_point)]['trajectory'])
-
-        
-
-        traj_future = np.array(states_array[start_point+60][str(start_point+60)]['trajectory'])[0:40,0:2]
-        traj_past = np.array(states_array[start_point-60][str(start_point-60)]['trajectory'])[...,0:2]
-        traj_past_first = np.array(states_array[start_point-80][str(start_point-80)]['trajectory'])[0:20,0:2]
-
-
-        l2_past_first = np.array(states_array[start_point-80][str(start_point-80)]['orientations_ned'])
-        l1_past_first = np.array(states_array[start_point-60][str(start_point-60)]['orientations_ned'])
-        angle_past_rad_first = l2_past_first[-1]-l1_past_first[-1]
-        #angle_past_rad = math.atan((traj_past[-1][1]-traj_past[-2][1])/(traj_past[-1][0]-traj_past[-2][0]))
-        rot_mat_past_first = np.array([
-            [math.cos(angle_past_rad_first),-math.sin(angle_past_rad_first)],
-            [math.sin(angle_past_rad_first),math.cos(angle_past_rad_first)]
-        ])
-        traj_past_first = traj_past_first-traj_past_first[-1]
-        transform_points_past_first = np.matmul(traj_past_first, rot_mat_past_first)
-
-        traj_past = np.vstack([transform_points_past_first,traj_past])
-
-
-
-        l2_past = np.array(states_array[start_point-60][str(start_point-60)]['orientations_ned'])
-        l1_past = np.array(states_array[start_point][str(start_point)]['orientations_ned'])
-        angle_past_rad = l2_past[-1]-l1_past[-1]
-        #angle_past_rad = math.atan((traj_past[-1][1]-traj_past[-2][1])/(traj_past[-1][0]-traj_past[-2][0]))
-        rot_mat_past = np.array([
-            [math.cos(angle_past_rad),-math.sin(angle_past_rad)],
-            [math.sin(angle_past_rad),math.cos(angle_past_rad)]
-        ])
-        traj_past = traj_past-traj_past[-1]
-        transform_points_past = (np.matmul(traj_past, rot_mat_past)[::-5])[::-1]
-
-
-        l2 = np.array(states_array[start_point+60][str(start_point+60)]['orientations_ned'])
-        l1 = np.array(states_array[start_point][str(start_point)]['orientations_ned'])
-        angle_rad = l2[-1]-l1[-1]
-        #angle_rad = math.atan((traj_present[1][1]-traj_present[0][1])/(traj_present[1][0]-traj_present[0][0]))
-        rot_mat = np.array([
-            [math.cos(angle_rad),-math.sin(angle_rad)],
-            [math.sin(angle_rad),math.cos(angle_rad)]
-        ])
-        transform_points = np.matmul(traj_future, rot_mat)
-        transform_points = np.array(states_array[start_point][str(start_point)]['trajectory'])[-1, 0:2]+transform_points
-        transform_points = np.vstack([trajectory[...,0:2],transform_points])
-        transform_points = np.vstack([transform_points[5::5], transform_points[-1]])
-
-        video_array_1 = video_array[(start_point-7):start_point+1]
-        video_array_1 = (video_array_1[::-2])[::-1]
-
-        video_array_resize = [cv2.resize(video_array_1[j], (int(video_array_1[j].shape[1]/resize_factor), int(video_array_1[j].shape[0]/resize_factor)), interpolation=cv2.INTER_AREA) for j in range(0,video_array_1.shape[0])]
-        video_array_resize = np.array(video_array_resize)
-
-        # plt.figure()
-        # plt.imshow(video_array_resize[-1])
-        # plt.savefig('/cluster/home/arsood/Semester_Project_Official/fig_2.png')
-        
-        
-
-        if(states_array[start_point][str(start_point)]['rightBlinker'] == True):
-            intent_traj = 'GO_RIGHT'
-        elif (states_array[start_point][str(start_point)]['leftBlinker'] == True):
-            intent_traj = 'GO_LEFT'
-
-        # plt.figure()
-        # plt.xlim([-20,20])
-        # #plt.plot(trajectory[...,1], trajectory[...,0], color='red')
-        # plt.plot(transform_points[...,1], transform_points[...,0], color='blue')
-        # plt.plot(transform_points_past[..., 1], transform_points_past[..., 0], color='green')
-        # plt.savefig('/cluster/home/arsood/Semester_Project_Official/fig_2.png')
-        
-        path_file_name = f"{path_name}-{start_point}"
-
-        np.set_printoptions(precision=4, suppress=True)
-        prompt_to_use = training_prompt_covla(np.array_str(transform_points_past), intent_traj, np.array_str(transform_points))
-        message_to_pass = [{
-        "role": "user",
-        "content": [
-            {"type": "video", "video": ""},
-            {"type": "text", "text": prompt_to_use },
-        ],
-        }
-        # ,{
-        #     "role": "assistant",
-        #     "content": [{"type": "text", "text": "{"+np.array_str(next_state_traj_5[...,:2])+"}"}],
-        # }
-        ]
-
-        return video_array_resize, message_to_pass, path_name, path_file_name
-    
+    return video_array_resize, driving_intent, transform_points_past, transform_points
 
 class CovlaDatasetTrainingAnnotated(Dataset):
-    def __init__(self, data_path_videos, data_path_states, indices, seq_len = 4, self_cur_idx = 7):
+    def __init__(self, data_path_videos, data_path_states, data_path_annotation, indices, seq_len = 4, self_cur_idx = 7):
         super().__init__()
         self.data_path_videos = data_path_videos
         self.list_videos = os.listdir(self.data_path_videos)
@@ -247,126 +112,68 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         self.list_states = os.listdir(self.data_path_states)
         self.list_states = sorted(self.list_states)
 
+        self.data_path_annotation = data_path_annotation
+        self.dir_annotation = os.listdir(data_path_annotation)
+        self.list_annotated_files = []
+        for el in self.dir_annotation:
+           path_name = os.path.join(self.data_path_annotation, el)
+           file_names_list = os.listdir(path_name)
+           for file in file_names_list:
+              self.list_annotated_files.append(os.path.join(path_name, file))
+
         self.list_videos = [self.list_videos[idx] for idx in indices]
         self.list_states = [self.list_states[idx] for idx in indices]
 
-        self.window = 40
         self.seq_len = seq_len
-        self.self_cur_idx = self_cur_idx
 
     def __len__(self):
-        return len(self.list_states)
+        return len(self.list_annotated_files)
     
     def __getitem__(self, index):
-        file_path_video = os.path.join(self.data_path_videos, self.list_videos[index])
-        file_path_states = os.path.join(self.data_path_states, self.list_states[index])
-        resize_factor = 4
+        file_data_path_name = os.path.splitext(self.list_annotated_files[index])[0]
+        drive_seg_idf = os.path.basename(os.path.dirname(file_data_path_name))
 
-        path_name = os.path.splitext(self.list_videos[index])[0]
+        video_data_path = os.path.join(self.data_path_videos, drive_seg_idf)
+        state_data_path = os.path.join(self.data_path_states, drive_seg_idf)
 
-        interval = 80+self.window*self.self_cur_idx
-        candidate_interval = list(range(interval, interval+40, 2))
-        start_point = random.choice(candidate_interval)
-
-        video_array = iio.imread(file_path_video, index=None)
-        states_array = []
-        intent_traj = "GO_STRAIGHT"
-        with open(file_path_states, 'r') as f:
-            for line in f:
-                if line.strip():
-                    states_array.append(json.loads(line))
-
-        trajectory = np.array(states_array[start_point][str(start_point)]['trajectory'])
-
+        start_point = int(self.list_annotated_files.split("-")[-1].split(".")[0])
         
+        front_image_list, driving_intent, past_state_traj, next_state_traj = return_objects(start_point, video_data_path, state_data_path)
 
-        traj_future = np.array(states_array[start_point+60][str(start_point+60)]['trajectory'])[0:40,0:2]
-        traj_past = np.array(states_array[start_point-60][str(start_point-60)]['trajectory'])[...,0:2]
-        traj_past_first = np.array(states_array[start_point-80][str(start_point-80)]['trajectory'])[0:20,0:2]
-
-
-        l2_past_first = np.array(states_array[start_point-80][str(start_point-80)]['orientations_ned'])
-        l1_past_first = np.array(states_array[start_point-60][str(start_point-60)]['orientations_ned'])
-        angle_past_rad_first = l2_past_first[-1]-l1_past_first[-1]
-        #angle_past_rad = math.atan((traj_past[-1][1]-traj_past[-2][1])/(traj_past[-1][0]-traj_past[-2][0]))
-        rot_mat_past_first = np.array([
-            [math.cos(angle_past_rad_first),-math.sin(angle_past_rad_first)],
-            [math.sin(angle_past_rad_first),math.cos(angle_past_rad_first)]
-        ])
-        traj_past_first = traj_past_first-traj_past_first[-1]
-        transform_points_past_first = np.matmul(traj_past_first, rot_mat_past_first)
-
-        traj_past = np.vstack([transform_points_past_first,traj_past])
-
-
-
-        l2_past = np.array(states_array[start_point-60][str(start_point-60)]['orientations_ned'])
-        l1_past = np.array(states_array[start_point][str(start_point)]['orientations_ned'])
-        angle_past_rad = l2_past[-1]-l1_past[-1]
-        #angle_past_rad = math.atan((traj_past[-1][1]-traj_past[-2][1])/(traj_past[-1][0]-traj_past[-2][0]))
-        rot_mat_past = np.array([
-            [math.cos(angle_past_rad),-math.sin(angle_past_rad)],
-            [math.sin(angle_past_rad),math.cos(angle_past_rad)]
-        ])
-        traj_past = traj_past-traj_past[-1]
-        transform_points_past = (np.matmul(traj_past, rot_mat_past)[::-5])[::-1]
-
-
-        l2 = np.array(states_array[start_point+60][str(start_point+60)]['orientations_ned'])
-        l1 = np.array(states_array[start_point][str(start_point)]['orientations_ned'])
-        angle_rad = l2[-1]-l1[-1]
-        #angle_rad = math.atan((traj_present[1][1]-traj_present[0][1])/(traj_present[1][0]-traj_present[0][0]))
-        rot_mat = np.array([
-            [math.cos(angle_rad),-math.sin(angle_rad)],
-            [math.sin(angle_rad),math.cos(angle_rad)]
-        ])
-        transform_points = np.matmul(traj_future, rot_mat)
-        transform_points = np.array(states_array[start_point][str(start_point)]['trajectory'])[-1, 0:2]+transform_points
-        transform_points = np.vstack([trajectory[...,0:2],transform_points])
-        transform_points = np.vstack([transform_points[5::5], transform_points[-1]])
-
-        video_array_1 = video_array[(start_point-7):start_point+1]
-        video_array_1 = (video_array_1[::-2])[::-1]
-
-        video_array_resize = [cv2.resize(video_array_1[j], (int(video_array_1[j].shape[1]/resize_factor), int(video_array_1[j].shape[0]/resize_factor)), interpolation=cv2.INTER_AREA) for j in range(0,video_array_1.shape[0])]
-        video_array_resize = np.array(video_array_resize)
-
-        # plt.figure()
-        # plt.imshow(video_array_resize[-1])
-        # plt.savefig('/cluster/home/arsood/Semester_Project_Official/fig_2.png')
-        
-        
-
-        if(states_array[start_point][str(start_point)]['rightBlinker'] == True):
-            intent_traj = 'GO_RIGHT'
-        elif (states_array[start_point][str(start_point)]['leftBlinker'] == True):
-            intent_traj = 'GO_LEFT'
-
-        # plt.figure()
-        # plt.xlim([-20,20])
-        # #plt.plot(trajectory[...,1], trajectory[...,0], color='red')
-        # plt.plot(transform_points[...,1], transform_points[...,0], color='blue')
-        # plt.plot(transform_points_past[..., 1], transform_points_past[..., 0], color='green')
-        # plt.savefig('/cluster/home/arsood/Semester_Project_Official/fig_2.png')
-        
-        path_file_name = f"{path_name}-{start_point}"
+        annotated_data = np.load(self.list_annotated_files[index], allow_pickle=True)
 
         np.set_printoptions(precision=4, suppress=True)
-        prompt_to_use = training_prompt_covla(np.array_str(transform_points_past), intent_traj, np.array_str(transform_points))
+        prompt_to_use = training_prompt_covla(np.array_str(past_state_traj), driving_intent, np.array_str(next_state_traj))
+        indices = [0, 3, 7, 11, 15, 19]
+        next_state_traj_5 = next_state_traj[indices]
+
+        clean_string = str(annotated_data).strip()
+        if clean_string.startswith("```json"):
+            clean_string = clean_string[len("```json"):].strip()
+        if clean_string.endswith("```"):
+            clean_string = clean_string[:-3].strip()
+
+        #print(annotated_data_ext)
+        gt_label = json.loads(str(clean_string))
+        
+        if(self.is_fut_traj):
+           gt_label["traj_fut"] = next_state_traj_5[..., 0:2].tolist()
+        gt_label = json.dumps(gt_label)
+        
         message_to_pass = [{
         "role": "user",
         "content": [
             {"type": "video", "video": ""},
-            {"type": "text", "text": prompt_to_use },
+            {"type": "text", "text": "" },
         ],
         }
-        # ,{
-        #     "role": "assistant",
-        #     "content": [{"type": "text", "text": "{"+np.array_str(next_state_traj_5[...,:2])+"}"}],
-        # }
+        ,{
+            "role": "assistant",
+            "content": [{"type": "text", "text": gt_label}],
+        }
         ]
 
-        return video_array_resize, message_to_pass, path_name, path_file_name
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj
 
 
 
