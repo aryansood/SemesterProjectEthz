@@ -39,8 +39,7 @@ gsutil -m cp -r gs://waymo_open_dataset_end_to_end_camera_v_1_0_0/val*.tfrecord*
 ---
 
 ### Step 4: Process the dataset
-Now run the following code 
-then do:
+After downloading, you need to process the .tfrecord files. Use the following command:
 ```bash
 python training_data_process.py \
     --dir <path_to_tfrecord_files> \
@@ -48,6 +47,12 @@ python training_data_process.py \
     --type <train_or_val>
 
 ```
+### Parameters
+
+- `--dir`: Path to the folder containing the `.tfrecord` files you want to process.  
+- `--save`: Path to the folder where the processed data should be saved.  
+- `--type`: Specify `train` for training data or `val` for validation data.
+
 #### Example for training data:
 ```bash
 python training_data_process.py --dir waymo_data/training --save processed/training --type train
