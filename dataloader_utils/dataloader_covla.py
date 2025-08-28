@@ -8,10 +8,7 @@ import imageio.v3 as iio
 import json
 from .strings import training_prompt_covla
 import random
-from scipy.interpolate import CubicSpline
 import math
-
-
 
 import matplotlib.pyplot as plt
 
@@ -102,7 +99,7 @@ def return_objects(start_point, file_path_video, file_path_states):
     return video_array_resize, driving_intent, transform_points_past, transform_points
 
 class CovlaDatasetTrainingAnnotated(Dataset):
-    def __init__(self, data_path_videos, data_path_states, data_path_annotation, indices, seq_len = 4, self_cur_idx = 7):
+    def __init__(self, data_path_videos, data_path_states, data_path_annotation, seq_len = 4, is_fut_traj = True):
         super().__init__()
         self.data_path_videos = data_path_videos
         self.list_videos = os.listdir(self.data_path_videos)
@@ -121,10 +118,8 @@ class CovlaDatasetTrainingAnnotated(Dataset):
            for file in file_names_list:
               self.list_annotated_files.append(os.path.join(path_name, file))
 
-        self.list_videos = [self.list_videos[idx] for idx in indices]
-        self.list_states = [self.list_states[idx] for idx in indices]
-
         self.seq_len = seq_len
+        self.is_fut_traj = is_fut_traj
 
     def __len__(self):
         return len(self.list_annotated_files)
@@ -133,10 +128,10 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         file_data_path_name = os.path.splitext(self.list_annotated_files[index])[0]
         drive_seg_idf = os.path.basename(os.path.dirname(file_data_path_name))
 
-        video_data_path = os.path.join(self.data_path_videos, drive_seg_idf)
-        state_data_path = os.path.join(self.data_path_states, drive_seg_idf)
+        video_data_path = f"{os.path.join(self.data_path_videos, drive_seg_idf)}.mp4"
+        state_data_path = f"{os.path.join(self.data_path_states, drive_seg_idf)}.jsonl"
 
-        start_point = int(self.list_annotated_files.split("-")[-1].split(".")[0])
+        start_point = int(self.list_annotated_files[index].split("-")[-1].split(".")[0])
         
         front_image_list, driving_intent, past_state_traj, next_state_traj = return_objects(start_point, video_data_path, state_data_path)
 
@@ -174,8 +169,51 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         ]
 
         return front_image_list, message_to_pass, past_state_traj, next_state_traj
+    
 
+class CovlaDatasetTraining(Dataset):
+    def __init__(self, data_path_videos, data_path_states, indices, seq_len = 4):
+        super().__init__()
+        self.data_path_videos = data_path_videos
+        self.list_videos = os.listdir(self.data_path_videos)
+        self.list_videos = sorted(self.list_videos)
 
+        self.data_path_states = data_path_states
+        self.list_states = os.listdir(self.data_path_states)
+        self.list_states = sorted(self.list_states)
+
+        self.list_videos = [self.list_videos[idx] for idx in indices]
+        self.list_states = [self.list_states[idx] for idx in indices]
+
+        self.seq_len = seq_len
+
+    def __len__(self):
+        return len(self.list_states)
+    
+    def __getitem__(self, index):
+        file_path_video = os.path.join(self.data_path_videos, self.list_videos[index])
+        file_path_states = os.path.join(self.data_path_states, self.list_states[index])
+
+        start_point = random.randint(80,460)
+
+        front_image_list, driving_intent, past_state_traj, next_state_traj = return_objects(start_point, file_path_video, file_path_states)
+        
+        np.set_printoptions(precision=4, suppress=True)
+        prompt_to_use = training_prompt_covla(np.array_str(past_state_traj), driving_intent, np.array_str(next_state_traj))
+        message_to_pass = [{
+        "role": "user",
+        "content": [
+            {"type": "video", "video": ""},
+            {"type": "text", "text": prompt_to_use },
+        ],
+        }
+        # ,{
+        #     "role": "assistant",
+        #     "content": [{"type": "text", "text": "{"+np.array_str(next_state_traj_5[...,:2])+"}"}],
+        # }
+        ]
+
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj
 
 
 

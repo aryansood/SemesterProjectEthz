@@ -36,15 +36,19 @@ class QwenModelVirtualTokens(nn.Module):
             task_type="CAUSAL_LM",
         )
 
+        embedding_virtual = nn.Embedding(V + n_new, D)
+
+        print(self.model.embeddings.weight.shape[0])
+        len_new_tokens = self.model.embeddings.weight.shape[0]+new_tokens_to_add
+        self.peft_model.resize_token_embeddings(len_new_tokens)
+
         self.peft_model = None
         if is_lora_config == True:
             self.peft_model = get_peft_model(self.model, peft_config)
         else:
             self.load()
 
-        print(self.model.embeddings.weight.shape[0])
-        len_new_tokens = self.model.embeddings.weight.shape[0]+new_tokens_to_add
-        self.peft_model.resize_token_embeddings(len_new_tokens)
+        
         
     
     def prepare_input_for_training(self, messages, images, videos):
@@ -70,8 +74,11 @@ class QwenModelVirtualTokens(nn.Module):
             labels[i][:indices_2[i]] = -100
 
 
-    def loss(logits, target):
-        pass
+    def loss(logits, labels):
+        criterion = nn.CrossEntropyLoss(ignore_index=-100)
+        loss = criterion(logits, labels)
+        return loss
+        
 
     def forward(self, x, labels):
         self.peft_model()
