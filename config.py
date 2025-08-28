@@ -19,12 +19,12 @@ class DataValWaymo:
 data_covla = DataCovla(
     covla_video="/cluster/scratch/arsood/covla/videos",
     covla_state="/cluster/scratch/arsood/covla/states",
-    covla_annotation="/cluster/scratch/arsood/covla_string"
+    covla_annotation="/cluster/scratch/arsood/covla_annot"
 )
 
 data_waymo_train = DataTrainWaymo(
     waymo_data="/cluster/scratch/arsood/data_clean",
-    waymo_annotation="/cluster/scratch/arsood/data_strings_train"
+    waymo_annotation="/cluster/scratch/arsood/waymo_annot"
 )
 
 data_waymo_val = DataValWaymo(
