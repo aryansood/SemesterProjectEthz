@@ -39,19 +39,23 @@ gsutil -m cp -r gs://waymo_open_dataset_end_to_end_camera_v_1_0_0/val*.tfrecord*
 ---
 
 ### Step 4: Process the dataset
-Open the (training_data_process.py) and change the following line, depending if you want to 
-```python
-DATASET_FOLDER = 'waymo_data/training' #Put the location of where the trfrecords are stored
-...
-
-SAVE_LOCATION = "/cluster/scratch/arsood/data_new" #Put the location of where to save the processed data
-...
-name_folders = name_folders_train #Choose if using name_folders_train or name_folders_val
-filenames = tf.io.matching_files(VALIDATION_FILES) #Choose beetween TRAIN_FILES, VALIDATION_FILES, TEST_FILES
-```
+Now run the following code 
 then do:
 ```bash
-python training_data_process.py
+python training_data_process.py \
+    --dir <path_to_tfrecord_files> \
+    --save <path_to_save_processed_data> \
+    --type <train_or_val>
+
+```
+#### Example for training data:
+```bash
+python training_data_process.py --dir waymo_data/training --save processed/training --type train
+```
+
+#### Example for validation data:
+```bash
+python training_data_process.py --dir waymo_data/validation --save processed/validation --type val
 ```
 
 
