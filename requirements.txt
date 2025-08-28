@@ -1,0 +1,12 @@
+imageio==2.37.0
+matplotlib==3.6.1
+numpy==1.23.5
+opencv_python==4.11.0.86
+peft==0.16.0
+qwen_vl_utils==0.0.11
+scipy==1.16.1
+tensorflow==2.13.0
+waymo_open_dataset==1.0.1
+torch==2.7.1
+tqdm==4.67.1
+transformers==4.54.0.dev0
