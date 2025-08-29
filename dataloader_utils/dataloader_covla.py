@@ -9,8 +9,9 @@ import json
 from .strings import training_prompt_covla
 import random
 import math
-
 import matplotlib.pyplot as plt
+import zipfile
+
 
 def train_collate_covla_fn(batch):
   front_images =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
@@ -99,7 +100,7 @@ def return_objects(start_point, file_path_video, file_path_states):
     return video_array_resize, driving_intent, transform_points_past, transform_points
 
 class CovlaDatasetTrainingAnnotated(Dataset):
-    def __init__(self, data_path_videos, data_path_states, data_path_annotation, seq_len = 4, is_fut_traj = True):
+    def __init__(self, data_path_videos, data_path_states, seq_len = 4, is_fut_traj = True):
         super().__init__()
         self.data_path_videos = data_path_videos
         self.list_videos = os.listdir(self.data_path_videos)
@@ -109,14 +110,9 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         self.list_states = os.listdir(self.data_path_states)
         self.list_states = sorted(self.list_states)
 
-        self.data_path_annotation = data_path_annotation
-        self.dir_annotation = os.listdir(data_path_annotation)
-        self.list_annotated_files = []
-        for el in self.dir_annotation:
-           path_name = os.path.join(self.data_path_annotation, el)
-           file_names_list = os.listdir(path_name)
-           for file in file_names_list:
-              self.list_annotated_files.append(os.path.join(path_name, file))
+        self.zip_annot_path = "data/covla_annot.zip"
+        self.zip_ref_annot = zipfile.ZipFile(self.zip_annot_path, 'r')
+        self.list_annotated_files = [f for f in self.zip_ref_annot.namelist() if not f.endswith('/')]
 
         self.seq_len = seq_len
         self.is_fut_traj = is_fut_traj
@@ -135,7 +131,9 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         
         front_image_list, driving_intent, past_state_traj, next_state_traj = return_objects(start_point, video_data_path, state_data_path)
 
-        annotated_data = np.load(self.list_annotated_files[index], allow_pickle=True)
+        annotated_data = ""
+        with self.zip_ref_annot.open(self.list_annotated_files[index]) as file_annot:
+           annotated_data = np.load(file_annot, allow_pickle=True)
 
         np.set_printoptions(precision=4, suppress=True)
         prompt_to_use = training_prompt_covla(np.array_str(past_state_traj), driving_intent, np.array_str(next_state_traj))

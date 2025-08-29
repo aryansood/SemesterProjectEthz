@@ -8,6 +8,7 @@ import tensorflow as tf
 import cv2
 from .strings import training_prompt
 import json
+import zipfile
 
 
 def return_front3_cameras(data: wod_e2ed_pb2.E2EDFrame):
@@ -100,21 +101,16 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
 
 
 class WaymoE2EDatasetTrainingAnnotated(Dataset):
-    def __init__(self, data_path, data_path_annotation, seq_len, is_fut_traj = True):
+    def __init__(self, data_path, seq_len, is_fut_traj = True):
         super().__init__()
 
         self.data_path = data_path
-        self.data_path_annotation = data_path_annotation
+        self.zip_annot_path = "data/waymo_annot.zip"
+
+        self.zip_ref_annot = zipfile.ZipFile(self.zip_annot_path, 'r')
+        self.list_annotated_files = [f for f in self.zip_ref_annot.namelist() if not f.endswith('/')]
 
         self.dir_list = os.listdir(data_path)
-        self.dir_annotation = os.listdir(data_path_annotation)
-
-        self.list_annotated_files = []
-        for el in self.dir_annotation:
-           path_name = os.path.join(self.data_path_annotation, el)
-           file_names_list = os.listdir(path_name)
-           for file in file_names_list:
-              self.list_annotated_files.append(os.path.join(path_name, file))
         
         self.seq_len = seq_len
         self.is_fut_traj = is_fut_traj
@@ -132,7 +128,9 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
         interval = file_data_names.index(filename_index_name)
         front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent = return_objects(interval-self.seq_len+1, interval+1, video_data_path, file_data_names)
 
-        annotated_data = np.load(self.list_annotated_files[index], allow_pickle=True)
+        annotated_data = ""
+        with self.zip_ref_annot.open(self.list_annotated_files[index]) as file_annot:
+           annotated_data = np.load(file_annot, allow_pickle=True)
 
         np.set_printoptions(precision=4, suppress=True)
         prompt_to_use = training_prompt(np.array_str(past_state_traj), drving_intent, np.array_str(next_state_traj))

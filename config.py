@@ -28,5 +28,5 @@ data_waymo_train = DataTrainWaymo(
 )
 
 data_waymo_val = DataValWaymo(
-    waymo_data="/cluster/scratch/arsood/data_val_clean",
+    waymo_data="/cluster/scratch/arsood/data_clean_val",
 )

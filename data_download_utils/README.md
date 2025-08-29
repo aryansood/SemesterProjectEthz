@@ -62,6 +62,12 @@ python training_data_process.py --dir waymo_data/training --save processed/train
 ```bash
 python training_data_process.py --dir waymo_data/validation --save processed/validation --type val
 ```
+---
 
+### Step 5: CoVLA dataset download
+Setup hugging face-cli and run the following to download CoVLA dataset.
+```bash
+hf download turing-motors/CoVLA-Dataset --repo-type dataset --local-dir <dir_to_save_dataset>
+```
 
 
