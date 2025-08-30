@@ -7,3 +7,4 @@ qwen_vl_utils==0.0.11
 torch==2.7.1
 tqdm==4.67.1
 transformers==4.54.0
+torchvision==0.22.1

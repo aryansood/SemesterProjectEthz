@@ -44,8 +44,8 @@ def return_rear3_cameras(data: wod_e2ed_pb2.E2EDFrame):
 def train_collate_fn(batch):
   front_images =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
   rear_image =[torch.from_numpy(el[1]).permute(0,3,1,2) for el in batch]
-  next_state_traj = [el[2] for el in batch]
-  past_state_traj = [el[3] for el in batch]
+  next_state_traj = [el[2][..., 0:2] for el in batch]
+  past_state_traj = [el[3][..., 0:2] for el in batch]
   intent_traj = [el[4] for el in batch]
   messages = [el[5] for el in batch]
   
