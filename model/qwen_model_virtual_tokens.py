@@ -7,6 +7,7 @@ from transformers import Qwen2_5_VLForConditionalGeneration, AutoTokenizer, Auto
 from qwen_vl_utils import process_vision_info
 from peft import LoraConfig, get_peft_model
 from torch import nn
+from torch.optim import Adam
 
 class QwenModelVirtualTokens(nn.Module):
     def __init__(self, cache_dir = '/cluster/scratch/arsood/cache_hugging_face', local_files_only= True, new_tokens_to_add = 20, is_training = True, is_lora_config = True, device = 'cuda'):
@@ -110,14 +111,14 @@ class QwenModelVirtualTokens(nn.Module):
         
 
     def forward(self, x):
-        batch, labels = self.prepare_input_for_training(x[5], None, x[0])
+        batch, labels = self.prepare_input_for_training(x[0], None, x[1])
         #output = self.peft_model(**batch, output_hidden_states = True)
         with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
             outputs = self.peft_model(**batch, output_hidden_states=True)
         last_hidden_layer_virtual_tokens = outputs.hidden_states[-1][:, -self.virtual_tokens_len:, :]
         traj_output = self.linear_to_traj(last_hidden_layer_virtual_tokens)
         print(outputs.logits)
-        loss_value = self.loss(outputs.logits, labels, torch.from_numpy(np.array(x[2])).to(self.device), traj_output)
+        loss_value = self.loss(outputs.logits, labels, torch.from_numpy(np.array(x[3])).to(self.device), traj_output)
         return outputs, loss_value
 
     def validate():
@@ -152,7 +153,7 @@ class QwenModelVirtualTokens(nn.Module):
         )
     
         inputs = inputs.to('cuda')
-        generated_ids = self.model.generate(**inputs, max_new_tokens=300)
+        generated_ids = self.peft_model.generate(**inputs, max_new_tokens=300)
         generated_ids_trimmed = [
             out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
         ]

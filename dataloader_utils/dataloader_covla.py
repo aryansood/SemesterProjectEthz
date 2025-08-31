@@ -11,20 +11,24 @@ import random
 import math
 import matplotlib.pyplot as plt
 import zipfile
+import av
+from decord import VideoReader, cpu
+import matplotlib.animation as animation
+from matplotlib.animation import FFMpegWriter
 
 
-def train_collate_covla_fn(batch):
+def train_collate_covla(batch):
   front_images =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
   messages = [el[1] for el in batch]
   past_traj = [el[2] for el in batch]
   fut_traj = [el[3] for el in batch]
-  batch_process = [front_images, messages, past_traj, fut_traj]
+  batch_process = [messages, front_images, past_traj, fut_traj]
   return batch_process
 
 
 def return_objects(start_point, file_path_video, file_path_states):
     resize_factor = 4
-    video_array = iio.imread(file_path_video, index=None)
+    #video_array = iio.imread(file_path_video, index=None)
 
     states_array = []
     driving_intent = "GO_STRAIGHT"
@@ -82,15 +86,12 @@ def return_objects(start_point, file_path_video, file_path_states):
     transform_points = np.vstack([trajectory[...,0:2],transform_points])
     transform_points = np.vstack([transform_points[5::5], transform_points[-1]])
 
-    video_array_1 = video_array[(start_point-7):start_point+1]
+    vr = VideoReader(file_path_video, ctx=cpu(0))
+    frame_indices = range(start_point-7, start_point+1)
+    video_array_1 = vr.get_batch(frame_indices).asnumpy()
     video_array_1 = (video_array_1[::-2])[::-1]
-
     video_array_resize = [cv2.resize(video_array_1[j], (int(video_array_1[j].shape[1]/resize_factor), int(video_array_1[j].shape[0]/resize_factor)), interpolation=cv2.INTER_AREA) for j in range(0,video_array_1.shape[0])]
     video_array_resize = np.array(video_array_resize)
-
-    # plt.figure()
-    # plt.imshow(video_array_resize[-1])
-    # plt.savefig('/cluster/home/arsood/Semester_Project_Official/fig_2.png')
     
     if(states_array[start_point][str(start_point)]['rightBlinker'] == True):
         driving_intent = 'GO_RIGHT'

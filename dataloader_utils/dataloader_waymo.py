@@ -41,7 +41,7 @@ def return_rear3_cameras(data: wod_e2ed_pb2.E2EDFrame):
 
   return image_list, calibration_list
 
-def train_collate_fn(batch):
+def train_collate_waymo(batch):
   front_images =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
   rear_image =[torch.from_numpy(el[1]).permute(0,3,1,2) for el in batch]
   next_state_traj = [el[2][..., 0:2] for el in batch]
@@ -49,7 +49,7 @@ def train_collate_fn(batch):
   intent_traj = [el[4] for el in batch]
   messages = [el[5] for el in batch]
   
-  batch_process = [front_images, rear_image, next_state_traj, past_state_traj, intent_traj, messages]
+  batch_process = [messages, front_images, past_state_traj, next_state_traj]
   return batch_process
 
 def return_objects(interval_start, interval_end, file_data_path, file_data_names):
