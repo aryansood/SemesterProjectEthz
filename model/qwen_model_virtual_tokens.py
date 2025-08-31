@@ -56,8 +56,8 @@ class QwenModelVirtualTokens(nn.Module):
 
         self.linear_to_traj = nn.Linear(size_prev_embedding[1], 2).to(device)
 
-        if torch.cuda.device_count() > 1:
-            self.peft_model = nn.DataParallel(self.peft_model)
+        # if torch.cuda.device_count() > 1:
+        #     self.peft_model = nn.DataParallel(self.peft_model)
         self.peft_model.to(device)
         self.virtual_tokens_len = new_tokens_to_add
 
@@ -98,14 +98,15 @@ class QwenModelVirtualTokens(nn.Module):
 
 
 
-    def loss(self, logits, labels, traj_gt, traj_pred):
+    def loss(self, logits, labels, traj_gt, traj_pred, lambda_1 = 0.5, lambda_2 = 0.5):
         logits = logits.permute(0, 2, 1)
         logits = logits[..., :-1]
         labels = labels[..., 1:]
         criterion = nn.CrossEntropyLoss(ignore_index=-100)
-        
-        loss_value = criterion(logits, labels)
-        return loss_value
+        loss_traj = (((traj_gt-traj_pred)**2).sum(dim=-1)).mean()
+        loss_cross = criterion(logits, labels)
+        loss_tot = lambda_1*loss_cross+lambda_2*loss_traj
+        return loss_tot
         
 
     def forward(self, x):
@@ -115,7 +116,9 @@ class QwenModelVirtualTokens(nn.Module):
             outputs = self.peft_model(**batch, output_hidden_states=True)
         last_hidden_layer_virtual_tokens = outputs.hidden_states[-1][:, -self.virtual_tokens_len:, :]
         traj_output = self.linear_to_traj(last_hidden_layer_virtual_tokens)
-        loss_value = self.loss(outputs.logits, labels, x[2], traj_output)
+        print(outputs.logits)
+        loss_value = self.loss(outputs.logits, labels, torch.from_numpy(np.array(x[2])).to(self.device), traj_output)
+        return outputs, loss_value
 
     def validate():
         pass
