@@ -141,10 +141,5 @@ def training_prompt_covla(intent, traj_past):
     "command": "straight | yield | left_turn | right_turn | lane_follow | lane_change_left |
     lane_change_right | reverse | other"
     }}
-    Task 4: Future Trajectory Prediction
-    Given the input, critical objects/conditions, natural language explanation, and meta-behaviour,
-    predict the optimal 5-second future trajectory (5 steps at 1 Hz) of the ego vehicle.
-    Output format (raw text, not markdown or LaTeX):
-    [x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5]
     """
     return prompt_to_pass

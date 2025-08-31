@@ -30,7 +30,7 @@ class QwenModelVirtualTokens(nn.Module):
         peft_config = LoraConfig(
             lora_alpha=16,
             lora_dropout=0.05,
-            r=16,
+            r=64,
             bias="none",
             target_modules=["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",], 
             task_type="CAUSAL_LM",
@@ -99,7 +99,7 @@ class QwenModelVirtualTokens(nn.Module):
 
 
 
-    def loss(self, logits, labels, traj_gt, traj_pred, lambda_1 = 0.5, lambda_2 = 0.5):
+    def loss(self, logits, labels, traj_gt, traj_pred, lambda_1 = 1, lambda_2 = 1):
         logits = logits.permute(0, 2, 1)
         logits = logits[..., :-1]
         labels = labels[..., 1:]
@@ -107,6 +107,8 @@ class QwenModelVirtualTokens(nn.Module):
         loss_traj = (((traj_gt-traj_pred)**2).sum(dim=-1)).mean()
         loss_cross = criterion(logits, labels)
         loss_tot = lambda_1*loss_cross+lambda_2*loss_traj
+        print("Loss cross", loss_cross)
+        print("Loss traj", loss_traj)
         return loss_tot
         
 
@@ -117,7 +119,16 @@ class QwenModelVirtualTokens(nn.Module):
             outputs = self.peft_model(**batch, output_hidden_states=True)
         last_hidden_layer_virtual_tokens = outputs.hidden_states[-1][:, -self.virtual_tokens_len:, :]
         traj_output = self.linear_to_traj(last_hidden_layer_virtual_tokens)
-        print(outputs.logits)
+        loss_value = self.loss(outputs.logits, labels, torch.from_numpy(np.array(x[3])).to(self.device), traj_output)
+        return outputs, loss_value
+    
+    def forward_inference(self, x):
+        batch, labels = self.prepare_input_for_training(x[0], None, x[1])
+        #output = self.peft_model(**batch, output_hidden_states = True)
+        with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
+            outputs = self.peft_model(**batch, output_hidden_states=True)
+        last_hidden_layer_virtual_tokens = outputs.hidden_states[-1][:, -self.virtual_tokens_len:, :]
+        traj_output = self.linear_to_traj(last_hidden_layer_virtual_tokens)
         loss_value = self.loss(outputs.logits, labels, torch.from_numpy(np.array(x[3])).to(self.device), traj_output)
         return outputs, loss_value
 
@@ -130,8 +141,25 @@ class QwenModelVirtualTokens(nn.Module):
     def load():
         pass
 
-    def prepare_input_for_inference():
-        pass
+    def prepare_input_for_inference(self, messages, images, videos):
+        len_batch = len(messages) 
+        self.processor.tokenizer.padding_side = "left"
+        texts = [
+        self.processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=False)
+        for msg in messages
+        ]
+        batch = self.processor(
+            text=texts,
+            images=images,
+            videos=videos,
+            padding=True,
+            return_tensors="pt",
+        )
+        virtual_token_expand = self.virtual_tokens_list_num.expand(len_batch , -1)
+        attention_mask_virtual_expand = self.attention_mask_virtual_tokens.expand(len_batch , -1)
+        batch["input_ids"] = torch.concat([batch["input_ids"], virtual_token_expand], dim = -1)
+        batch["attention_mask"] = torch.concat([batch["attention_mask"], attention_mask_virtual_expand], dim = -1)
+        
         
     def generate(self, messages, images, videos):
         """
@@ -153,7 +181,8 @@ class QwenModelVirtualTokens(nn.Module):
         )
     
         inputs = inputs.to('cuda')
-        generated_ids = self.peft_model.generate(**inputs, max_new_tokens=300)
+        generated_ids = self.peft_model.generate(**inputs, max_new_tokens=200)
+
         generated_ids_trimmed = [
             out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
         ]
