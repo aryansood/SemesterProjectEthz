@@ -30,7 +30,7 @@ class QwenModelVirtualTokens(nn.Module):
         peft_config = LoraConfig(
             lora_alpha=16,
             lora_dropout=0.05,
-            r=64,
+            r=16,
             bias="none",
             target_modules=["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",], 
             task_type="CAUSAL_LM",
@@ -133,12 +133,6 @@ class QwenModelVirtualTokens(nn.Module):
         return outputs, loss_value
 
     def validate():
-        pass
-
-    def trainer():
-        pass
-
-    def load():
         pass
 
     def prepare_input_for_inference(self, messages, images, videos):

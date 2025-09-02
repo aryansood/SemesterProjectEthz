@@ -6,7 +6,7 @@ import random
 import numpy as np
 import tensorflow as tf
 import cv2
-from .strings import training_prompt
+from .prompt_train import training_prompt_waymo
 import json
 
 
@@ -40,15 +40,14 @@ def return_rear3_cameras(data: wod_e2ed_pb2.E2EDFrame):
 
   return image_list, calibration_list
 
-def train_collate_fn(batch):
+def val_collate_waymo(batch):
   front_images =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
   rear_image =[torch.from_numpy(el[1]).permute(0,3,1,2) for el in batch]
-  next_state_traj = [el[2] for el in batch]
-  past_state_traj = [el[3] for el in batch]
-  intent_traj = [el[4] for el in batch]
-  messages = [el[5] for el in batch]
-  
-  batch_process = [front_images, rear_image, next_state_traj, past_state_traj, intent_traj, messages]
+  past_state_traj = [el[2][..., 0:2] for el in batch]
+  message_to_pass = [el[3] for el in batch]
+  traj_rater = [el[4] for el in batch]
+  traj_rat_score = [el[5] for el in batch]
+  batch_process = [message_to_pass, front_images, past_state_traj, traj_rat_score, traj_rater]
   return batch_process
 
 def return_objects(interval_start, interval_end, file_data_path, file_data_names):
@@ -91,20 +90,19 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
           rear_concatenated = cv2.resize(rear_concatenated, (int(rear_concatenated.shape[1]/resize_factor), int(rear_concatenated.shape[0]/resize_factor)), interpolation=cv2.INTER_AREA) 
           rear_image_list.append(rear_concatenated)
           if(el == interval_end-1):
-            for el in data.preference_trajectories:
-               traj_rat_point = np.stack([el.pos_x, el.pos_y], axis=-1)
+            for el_traj in data.preference_trajectories:
+               traj_rat_point = np.stack([el_traj.pos_x, el_traj.pos_y], axis=-1)
                traj_rater.append(traj_rat_point)
-               traj_rat_score.append(el.preference_score)
+               traj_rat_score.append(el_traj.preference_score)
     
   
   front_image_list = np.array(front_image_list)
   rear_image_list = np.array(rear_image_list)
-  next_state_traj = np.array(next_state_traj)
   past_state_traj = np.array(past_state_traj)
-  traj_rater = np.array(traj_rater)
+  #traj_rater = np.array(traj_rater)
   traj_rat_score = np.array(traj_rat_score)
 
-  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, traj_rater, traj_rat_score
+  return front_image_list, rear_image_list, past_state_traj, driving_intent, traj_rater, traj_rat_score
    
 class WaymoE2EDatasetVal(Dataset):
     def __init__(self, data_path, seq_len):
@@ -123,25 +121,20 @@ class WaymoE2EDatasetVal(Dataset):
         file_data_path = os.path.join(self.data_path, file_name)
         file_data_names = sorted(os.listdir(file_data_path))
 
-        
-
         index_to_start = file_data_names.index(self.list_val_rater[index])
 
-        front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent, traj_rater, traj_rat_score = return_objects(index_to_start-self.seq_len+1, index_to_start+1, file_data_path, file_data_names)
+        front_image_list, rear_image_list, past_state_traj, drving_intent, traj_rater, traj_rat_score = return_objects(index_to_start-self.seq_len+1, index_to_start+1, file_data_path, file_data_names)
 
-        np.set_printoptions(precision=4, suppress=True)
+        np.set_printoptions(suppress=True)
 
-        print(traj_rater.shape)
-
-        prompt_to_use = training_prompt(np.array_str(past_state_traj), drving_intent, np.array_str(next_state_traj))
+        prompt_to_use = training_prompt_waymo(drving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 3)))
 
         message_to_pass = [{
         "role": "user",
         "content": [
             {"type": "video", "video": ""},
-            {"type": "text", "text": prompt_to_use },
+            {"type": "text", "text": prompt_to_use},
         ],
         }
         ]
-
-        return front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent, message_to_pass
+        return front_image_list, rear_image_list, past_state_traj, message_to_pass, traj_rater, traj_rat_score

@@ -133,7 +133,6 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         with self.zip_ref_annot.open(self.list_annotated_files[index]) as file_annot:
            annotated_data = np.load(file_annot, allow_pickle=True)
 
-        np.set_printoptions(precision=4, suppress=True)
         indices = [0, 3, 7, 11, 15, 19]
         next_state_traj_5 = next_state_traj[indices]
 
@@ -142,13 +141,14 @@ class CovlaDatasetTrainingAnnotated(Dataset):
             clean_string = clean_string[len("```json"):].strip()
         if clean_string.endswith("```"):
             clean_string = clean_string[:-3].strip()
-
+        
+        np.set_printoptions(suppress=True)
         gt_label = json.loads(str(clean_string))
-        # if(self.is_fut_traj):
-        #    gt_label["traj_fut"] = next_state_traj_5[..., 0:2].tolist()
+        if(self.is_fut_traj):
+           gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 3).tolist()
         gt_label = json.dumps(gt_label)
         
-        prompt_to_use = training_prompt_covla(driving_intent, np.array_str(past_state_traj))
+        prompt_to_use = training_prompt_covla(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 3)))
         
         message_to_pass = [{
         "role": "user",

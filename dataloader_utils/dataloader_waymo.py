@@ -101,7 +101,7 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
 
 
 class WaymoE2EDatasetTrainingAnnotated(Dataset):
-    def __init__(self, data_path, seq_len, is_fut_traj = True):
+    def __init__(self, data_path, seq_len, is_fut_traj = False):
         super().__init__()
 
         self.data_path = data_path
@@ -132,7 +132,6 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
         with self.zip_ref_annot.open(self.list_annotated_files[index]) as file_annot:
            annotated_data = np.load(file_annot, allow_pickle=True)
 
-        np.set_printoptions(precision=4, suppress=True)
         prompt_to_use = training_prompt(np.array_str(past_state_traj), drving_intent, np.array_str(next_state_traj))
         indices = [0, 3, 7, 11, 15, 19]
         next_state_traj_5 = next_state_traj[indices]
@@ -143,11 +142,11 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
         if clean_string.endswith("```"):
             clean_string = clean_string[:-3].strip()
 
-        #print(annotated_data_ext)
+        np.set_printoptions(suppress=True)
         gt_label = json.loads(str(clean_string))
         
         if(self.is_fut_traj):
-           gt_label["traj_fut"] = next_state_traj_5[..., 0:2].tolist()
+           gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 3).tolist()
         gt_label = json.dumps(gt_label)
 
         message_to_pass = [{

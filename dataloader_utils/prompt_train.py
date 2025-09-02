@@ -67,9 +67,12 @@ def training_prompt_waymo(intent, traj_past):
     }}
     Task 4: Future Trajectory Prediction
     Given the input, critical objects/conditions, natural language explanation, and meta-behaviour,
-    predict the optimal 5-second future trajectory (5 steps at 1 Hz) of the ego vehicle.
+    predict the optimal 5-second future trajectory (6 steps at 1 Hz, the first point rappresent second 0.25) of the ego vehicle.
     Output format (raw text, not markdown or LaTeX):
-    [x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5]
+    Output format Json as follows(raw text, not markdown or LaTeX):
+    {
+    "traj_fut": [[x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5], [x_6, y_6]]
+    }
     """
     return prompt_to_pass
 
@@ -141,5 +144,47 @@ def training_prompt_covla(intent, traj_past):
     "command": "straight | yield | left_turn | right_turn | lane_follow | lane_change_left |
     lane_change_right | reverse | other"
     }}
+    Task 4: Future Trajectory Prediction
+    Given the input, critical objects/conditions, natural language explanation, and meta-behaviour,
+    predict the optimal 5-second future trajectory (6 steps at 1 Hz, the first point rappresent second 0.25) of the ego vehicle.
+    Output format Json as follows(raw text, not markdown or LaTeX):
+    {
+    "traj_fut": [[x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5], [x_6, y_6]]
+    }
+    """
+    return prompt_to_pass
+
+
+def training_prompt_covla_direct_traj(intent, traj_past):
+    prompt_to_pass = """
+    You are an expert left-hand-side driver.
+    Input:
+    - 1 frame of front-view images collected from the ego-vehicle at the present timestep
+    - Current high-level intent """+intent+"""
+    - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
+    Task: Future Trajectory Prediction
+    Given the input, intent and past trajectory,
+    predict the optimal 5-second future trajectory (6 steps at 1 Hz, the first point rappresent second 0.25) of the ego vehicle.
+    Output format Json as follows(raw text, not markdown or LaTeX):
+    {
+    "traj_fut": [[x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5], [x_6, y_6]]
+    }
+    """
+    return prompt_to_pass
+
+def training_prompt_waymo_direct_traj(intent, traj_past):
+    prompt_to_pass = """
+    You are an expert driver.
+    Input:
+    - 1 frame of multi-view images collected from the ego-vehicle at the present timestep
+    - Current high-level intent """+intent+"""
+    - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
+    Task: Future Trajectory Prediction
+    Given the input, intent and past trajectory,
+    predict the optimal 5-second future trajectory (6 steps at 1 Hz, the first point rappresent second 0.25) of the ego vehicle.
+    Output format Json as follows(raw text, not markdown or LaTeX):
+    {
+    "traj_fut": [[x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5], [x_6, y_6]]
+    }
     """
     return prompt_to_pass
