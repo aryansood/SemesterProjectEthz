@@ -2,7 +2,7 @@ def training_prompt_waymo(intent, traj_past):
     prompt_to_pass = """
     You are an expert driver.
     Input:
-    - 1 frame of multi-view images collected from the ego-vehicle at the present timestep
+    - 4 frames of multi-view images images collected from the ego-vehicle over the last second
     - Current high-level intent """+intent+"""
     - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
     Task 1: Critical Objects and Conditions Detection
@@ -81,7 +81,7 @@ def training_prompt_covla(intent, traj_past):
     prompt_to_pass = """
     You are an expert left-hand-side driver.
     Input:
-    - 1 frame of front-view images collected from the ego-vehicle at the present timestep
+    - 4 frames of front-view images images collected from the ego-vehicle over the last second
     - Current high-level intent """+intent+"""
     - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
     Task 1: Critical Objects and Conditions Detection
@@ -159,7 +159,7 @@ def training_prompt_covla_direct_traj(intent, traj_past):
     prompt_to_pass = """
     You are an expert left-hand-side driver.
     Input:
-    - 1 frame of front-view images collected from the ego-vehicle at the present timestep
+    - 4 frames of front-view images images collected from the ego-vehicle over the last second
     - Current high-level intent """+intent+"""
     - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
     Task: Future Trajectory Prediction
@@ -176,7 +176,7 @@ def training_prompt_waymo_direct_traj(intent, traj_past):
     prompt_to_pass = """
     You are an expert driver.
     Input:
-    - 1 frame of multi-view images collected from the ego-vehicle at the present timestep
+    - 4 frames of multi-view images images collected from the ego-vehicle over the last second
     - Current high-level intent """+intent+"""
     - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
     Task: Future Trajectory Prediction

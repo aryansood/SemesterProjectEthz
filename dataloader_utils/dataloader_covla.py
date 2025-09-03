@@ -5,7 +5,7 @@ import random
 import numpy as np
 import cv2
 import json
-from .prompt_train import training_prompt_covla
+from .prompt_train import training_prompt_covla, training_prompt_covla_direct_traj
 import random
 import math
 import matplotlib.pyplot as plt
@@ -166,7 +166,7 @@ class CovlaDatasetTrainingAnnotated(Dataset):
     
 
 class CovlaDatasetTraining(Dataset):
-    def __init__(self, data_path_videos, data_path_states, indices, seq_len = 4):
+    def __init__(self, data_path_videos, data_path_states, seq_len = 4, indices = list(range(5000, 9999))):
         super().__init__()
         self.data_path_videos = data_path_videos
         self.list_videos = os.listdir(self.data_path_videos)
@@ -192,8 +192,15 @@ class CovlaDatasetTraining(Dataset):
 
         front_image_list, driving_intent, past_state_traj, next_state_traj = return_objects(start_point, file_path_video, file_path_states)
         
-        np.set_printoptions(precision=4, suppress=True)
-        prompt_to_use = training_prompt_covla(np.array_str(past_state_traj), driving_intent, np.array_str(next_state_traj))
+        indices = [0, 3, 7, 11, 15, 19]
+        next_state_traj_5 = next_state_traj[indices]
+        np.set_printoptions(suppress=True)
+
+        gt_label = {"traj_fut": np.round(next_state_traj_5[..., 0:2], 3).tolist()}
+        gt_label = json.dumps(gt_label)
+
+        prompt_to_use = training_prompt_covla_direct_traj(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 3)))
+
         message_to_pass = [{
         "role": "user",
         "content": [
@@ -201,12 +208,11 @@ class CovlaDatasetTraining(Dataset):
             {"type": "text", "text": prompt_to_use },
         ],
         }
-        # ,{
-        #     "role": "assistant",
-        #     "content": [{"type": "text", "text": "{"+np.array_str(next_state_traj_5[...,:2])+"}"}],
-        # }
+        ,{
+            "role": "assistant",
+            "content": [{"type": "text", "text": gt_label}],
+        }
         ]
-
         return front_image_list, message_to_pass, past_state_traj, next_state_traj
 
 

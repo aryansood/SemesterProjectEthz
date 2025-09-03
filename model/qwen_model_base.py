@@ -16,18 +16,18 @@ class QwenBaseModel(nn.Module):
     def __init__(self, cache_dir = '/cluster/scratch/arsood/cache_hugging_face', local_files_only= True, is_training = True, is_lora_config = True, path_checkpoint = "",device = 'cuda'):
         super(QwenBaseModel, self).__init__()
 
-        model_qwen_select =  "Qwen/Qwen2.5-VL-3B-Instruct"
+        model_qwen_select =  "/cluster/scratch/arsood/cache_hugging_face/Qwen2.5-VL-3B-Instruct/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots/66285546d2b821cf421d4f5eb2576359d3770cd3"#"Qwen/Qwen2.5-VL-3B-Instruct"
         
         self.device = device
 
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            model_qwen_select, torch_dtype=torch.bfloat16, device_map=device,
-            cache_dir = cache_dir, local_files_only= local_files_only)
+            model_qwen_select, torch_dtype=torch.bfloat16, device_map=device)
+            #cache_dir = cache_dir, local_files_only= local_files_only)
 
         self.processor = AutoProcessor.from_pretrained(
             model_qwen_select,
-            cache_dir=cache_dir,
-            local_files_only=local_files_only
+            #cache_dir=cache_dir,
+            #local_files_only=local_files_only
             )
 
         peft_config = LoraConfig(
@@ -128,7 +128,7 @@ class QwenBaseModel(nn.Module):
         self.is_training = True
 
     def save(self, path_to_save):
-        self.peft_model.save_pretrained(path_to_save)
+        self.peft_model.save_pretrained(path_to_save, safe_serialization=True)
 
     def load(self, path_checkpoint):
         model_combined = PeftModel.from_pretrained(self.model, path_checkpoint)
