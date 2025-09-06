@@ -42,12 +42,13 @@ def return_rear3_cameras(data: wod_e2ed_pb2.E2EDFrame):
 
 def val_collate_waymo(batch):
   front_images =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
-  rear_image =[torch.from_numpy(el[1]).permute(0,3,1,2) for el in batch]
+  #rear_image =[torch.from_numpy(el[1]).permute(0,3,1,2) for el in batch]
+  next_state_traj = [el[1][..., 0:2] for el in batch]
   past_state_traj = [el[2][..., 0:2] for el in batch]
   message_to_pass = [el[3] for el in batch]
   traj_rater = [el[4] for el in batch]
   traj_rat_score = [el[5] for el in batch]
-  batch_process = [message_to_pass, front_images, past_state_traj, traj_rat_score, traj_rater]
+  batch_process = [message_to_pass, front_images, past_state_traj, traj_rat_score, traj_rater, next_state_traj]
   return batch_process
 
 def return_objects(interval_start, interval_end, file_data_path, file_data_names):
@@ -97,12 +98,12 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
     
   
   front_image_list = np.array(front_image_list)
-  rear_image_list = np.array(rear_image_list)
+  next_state_traj = np.array(next_state_traj)
   past_state_traj = np.array(past_state_traj)
-  #traj_rater = np.array(traj_rater)
+  #traj_rater = np.concatenate(traj_rater, axis=0)
   traj_rat_score = np.array(traj_rat_score)
 
-  return front_image_list, rear_image_list, past_state_traj, driving_intent, traj_rater, traj_rat_score
+  return front_image_list, next_state_traj, past_state_traj, driving_intent, traj_rater, traj_rat_score
    
 class WaymoE2EDatasetVal(Dataset):
     def __init__(self, data_path, seq_len):
@@ -123,7 +124,7 @@ class WaymoE2EDatasetVal(Dataset):
 
         index_to_start = file_data_names.index(self.list_val_rater[index])
 
-        front_image_list, rear_image_list, past_state_traj, drving_intent, traj_rater, traj_rat_score = return_objects(index_to_start-self.seq_len+1, index_to_start+1, file_data_path, file_data_names)
+        front_image_list, next_state_traj, past_state_traj, drving_intent, traj_rater, traj_rat_score = return_objects(index_to_start-self.seq_len+1, index_to_start+1, file_data_path, file_data_names)
 
         np.set_printoptions(suppress=True)
 
@@ -137,4 +138,4 @@ class WaymoE2EDatasetVal(Dataset):
         ],
         }
         ]
-        return front_image_list, rear_image_list, past_state_traj, message_to_pass, traj_rater, traj_rat_score
+        return front_image_list, next_state_traj, past_state_traj, message_to_pass, traj_rater, traj_rat_score

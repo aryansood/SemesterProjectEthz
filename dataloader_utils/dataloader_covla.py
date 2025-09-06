@@ -19,8 +19,13 @@ def train_collate_covla(batch):
   messages = [el[1] for el in batch]
   past_traj = [el[2] for el in batch]
   fut_traj = [el[3] for el in batch]
-  batch_process = [messages, front_images, past_traj, fut_traj]
-  return batch_process
+  batch_dict = {
+        "messages": messages,
+        "front_images": front_images,
+        "past_state_traj": past_traj,
+        "next_state_traj": fut_traj,
+    }
+  return batch_dict
 
 
 def return_objects(start_point, file_path_video, file_path_states):

@@ -11,12 +11,13 @@ from torch.optim import Adam
 from scipy.interpolate import CubicSpline
 import re
 from peft import PeftModel
+import json
 
 class QwenBaseModel(nn.Module):
     def __init__(self, cache_dir = '/cluster/scratch/arsood/cache_hugging_face', local_files_only= True, is_training = True, is_lora_config = True, path_checkpoint = "",device = 'cuda'):
         super(QwenBaseModel, self).__init__()
 
-        model_qwen_select =  "/cluster/scratch/arsood/cache_hugging_face/Qwen2.5-VL-3B-Instruct/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots/66285546d2b821cf421d4f5eb2576359d3770cd3"#"Qwen/Qwen2.5-VL-3B-Instruct"
+        model_qwen_select =  "/cluster/scratch/arsood/cache_hugging_face/Qwen2.5-VL-3B-Instruct/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots/66285546d2b821cf421d4f5eb2576359d3770cd3"
         
         self.device = device
 
@@ -31,23 +32,25 @@ class QwenBaseModel(nn.Module):
             )
 
         peft_config = LoraConfig(
-            lora_alpha=16,
+            lora_alpha=128,
             lora_dropout=0.05,
-            r=16,
+            r=64,
             bias="none",
             target_modules=["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",], 
             task_type="CAUSAL_LM",
         )
 
-        self.peft_model = None
-        if is_lora_config == True:
-            self.peft_model = get_peft_model(self.model, peft_config)
-        else:
-            self.peft_model = self.load(path_checkpoint)
+        self.peft_model = self.model
+        for param in self.model.parameters():
+            param.requires_grad = True
+        # if is_lora_config == True:
+        #     self.peft_model = get_peft_model(self.model, peft_config)
+        # else:
+        #     self.peft_model = self.load(path_checkpoint)
 
-        # for name, param in self.peft_model.named_parameters():
-        #     if param.requires_grad:
-        #         print(f"{name}: requires_grad = {param.requires_grad}")
+        for name, param in self.peft_model.named_parameters():
+            if param.requires_grad:
+                print(f"{name}: requires_grad = {param.requires_grad}")
 
        
         # if torch.cuda.device_count() > 1:
@@ -101,10 +104,17 @@ class QwenBaseModel(nn.Module):
             return outputs, loss_value
         
         return outputs
+    
+    def loss_validation(self, pred, target):
+        loss_diff = torch.sqrt(torch.square(pred-target).sum(dim = -1)).mean(dim = 0)
+        return loss_diff
 
     def validate(self, x):
         self.is_training = False
         input_ids =  self.prepare_input_for_training(x[0], None, x[1])
+        index_max = np.argmax(np.array(x[3]), axis = 1)
+        traj_fut_opt = np.array(x[5])
+        l = 0
         with torch.no_grad():
             outputs = self.peft_model.generate(**input_ids, max_new_tokens=400)
             generated_ids_trimmed = [
@@ -112,26 +122,42 @@ class QwenBaseModel(nn.Module):
             ]
             output_text = self.processor.batch_decode( 
                 generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-            print(output_text)
-            # for el_out in outputs:
-            #     s_clean = el_out.strip('{}')
-            #     numbers = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", s_clean)))
-            #     arr = np.array(numbers).reshape(-1, 2)
-            #     index = [0, 3, 7, 11, 15, 19]
-            #     cs_x = CubicSpline(index, arr[...,0])
-            #     cs_y = CubicSpline(index, arr[...,1])
-            #     t_high = np.arange(0, 20)
-            #     x_high = cs_x(t_high)[:, None]
-            #     y_high = cs_y(t_high)[:, None]
-            #     #x = next_state_traj[...,0]
-            #     #y = next_state_traj[...,1]
+            traj_list_gt = []
+            traj_list_pred = []
+            for el in output_text:
+                clean_string = str(el).strip()
+                if clean_string.startswith("```json"):
+                    clean_string = clean_string[len("```json"):].strip()
+                if clean_string.endswith("```"):
+                    clean_string = clean_string[:-3].strip()
+                gt_label = json.loads(str(clean_string))
+                arr = np.array(gt_label['traj_fut'])
+                index = [0, 3, 7, 11, 15, 19]
+                cs_x = CubicSpline(index, arr[...,0])
+                cs_y = CubicSpline(index, arr[...,1])
+                t_high = np.arange(0, 20)
+                x_high = cs_x(t_high)[:, None]
+                y_high = cs_y(t_high)[:, None]
+                traj_pred = np.concatenate([x_high, y_high], axis = -1)
+                traj_rat_best = x[4][l][int(index_max[l])]
+                if(traj_rat_best.shape[0] == 21):
+                    traj_list_gt.append(traj_fut_opt[l][...,0:2])#traj_rat_best[:-1])
+                    traj_list_pred.append(traj_pred)
+                l += 1
+            traj_list_gt = torch.from_numpy(np.array(traj_list_gt))
+            traj_list_pred = torch.from_numpy(np.array(traj_list_pred))
+            loss_avg = self.loss_validation(traj_list_pred, traj_list_gt)
+            
         self.is_training = True
+        return loss_avg
 
     def save(self, path_to_save):
         self.peft_model.save_pretrained(path_to_save, safe_serialization=True)
 
     def load(self, path_checkpoint):
         model_combined = PeftModel.from_pretrained(self.model, path_checkpoint)
+        model_combined.train()
+        model_combined.enable_adapter_layers()
         return model_combined
     
     def generate(self, messages, images, videos):

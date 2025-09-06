@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 import cv2
 from .prompt_train import training_prompt_waymo, training_prompt_waymo_direct_traj
+from .strings import training_prompt
 import json
 import zipfile
 
@@ -48,9 +49,13 @@ def train_collate_waymo(batch):
   past_state_traj = [el[3][..., 0:2] for el in batch]
   intent_traj = [el[4] for el in batch]
   messages = [el[5] for el in batch]
-  
-  batch_process = [messages, front_images, past_state_traj, next_state_traj]
-  return batch_process
+  batch_dict = {
+        "messages": messages,
+        "front_images": front_images,
+        "past_state_traj": past_state_traj,
+        "next_state_traj": next_state_traj,
+    }
+  return batch_dict
 
 def return_objects(interval_start, interval_end, file_data_path, file_data_names):
 
@@ -161,8 +166,7 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
             "content": [{"type": "text", "text": gt_label}],
         }
         ]
-
-        return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, message_to_pass
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj 
     
 class WaymoE2EDatasetTraining(Dataset):
     def __init__(self, data_path, seq_len):
@@ -204,7 +208,6 @@ class WaymoE2EDatasetTraining(Dataset):
             "content": [{"type": "text", "text": gt_label}],
         }
         ]
-
         return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, message_to_pass
     
 class WaymoE2EDatasetLabeler(Dataset):
