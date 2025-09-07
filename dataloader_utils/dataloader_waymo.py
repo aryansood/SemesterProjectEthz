@@ -221,7 +221,7 @@ class WaymoE2EDatasetLabeler(Dataset):
         return len(self.dir_list)
     
     def __getitem__(self, index):
-        
+        data_point_name = self.dir_list[index]
         file_data_path = os.path.join(self.data_path, self.dir_list[index])
         file_data_names = sorted(os.listdir(file_data_path))
 
@@ -230,6 +230,7 @@ class WaymoE2EDatasetLabeler(Dataset):
         if(interval >= len(file_data_names)-10):
            interval = len(file_data_names)-self.seq_len-10
 
+        last_file_name = file_data_names[interval+self.seq_len-1]
         front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent = return_objects(interval, interval+self.seq_len, file_data_path, file_data_names)
 
         np.set_printoptions(precision=4, suppress=True)
@@ -248,5 +249,4 @@ class WaymoE2EDatasetLabeler(Dataset):
         }
         ]
 
-        return front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent, message_to_pass
-
+        return front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent, message_to_pass, last_file_name

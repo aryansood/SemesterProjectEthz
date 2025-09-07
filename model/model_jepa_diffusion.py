@@ -6,6 +6,7 @@ import cv2
 from torch import nn
 from torch.optim import Adam
 from transformers import AutoVideoProcessor
+from transformers import CLIPModel, CLIPProcessor
 
 class JepaPredictTraj(nn.Module):
     def __init__(self, device):
@@ -21,11 +22,18 @@ class JepaPredictTraj(nn.Module):
         )
         processor = AutoVideoProcessor.from_pretrained("facebook/vjepa2-vitl-fpc64-256")
 
-        #model.get_vision_features()`
+        model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+        processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
+        """
+        inputs = processor(text=texts, return_tensors="pt", padding=True)
 
-
-
+        # Encode the text with CLIP text encoder
+        with torch.no_grad():
+            output = model.get_text_features(**inputs) 
+        """
+        self.mlp_clip_embedding = nn.Linear()
+        self.mpl_ergo_status = nn.Linear()
 
 
 

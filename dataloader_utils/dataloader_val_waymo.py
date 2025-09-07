@@ -138,4 +138,4 @@ class WaymoE2EDatasetVal(Dataset):
         ],
         }
         ]
-        return front_image_list, next_state_traj, past_state_traj, message_to_pass, traj_rater, traj_rat_score
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj

@@ -23,7 +23,7 @@ class QwenFineTunedModelText(nn.Module):
             cache_model, torch_dtype=torch.bfloat16, device_map=device)
 
         self.processor = AutoProcessor.from_pretrained(
-            cache_model
+            "/cluster/scratch/arsood/cache_hugging_face/Qwen2.5-VL-3B-Instruct/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots/66285546d2b821cf421d4f5eb2576359d3770cd3"
             )
 
         self.peft_model = self.model
@@ -105,7 +105,7 @@ class QwenFineTunedModelText(nn.Module):
         model_combined.enable_adapter_layers()
         return model_combined
     
-    def generate(self, batch_input, max_new_tokens = 200):
+    def generate(self, batch_input, max_new_tokens = 400):
         self.is_training = False
         input_ids = self.prepare_input_for_training(batch_input["messages"], None, batch_input["front_images"])
         outputs = self.peft_model.generate(**input_ids, max_new_tokens=max_new_tokens)
