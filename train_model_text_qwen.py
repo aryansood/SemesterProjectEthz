@@ -41,7 +41,6 @@ for batch in tqdm(val_loader):
     ani = animation.ArtistAnimation(fig, frames, interval=50, blit=True, repeat_delay=1000)
     writer = FFMpegWriter(fps=20, bitrate=1800)
     ani.save('/cluster/home/arsood/Semester_Project_Official/video.mp4', writer=writer, dpi=300)
-    input_l = input("input?")
 
 #trainer(model, train_dataset, 2, 2, train_collate, val_dataset=val_dataset, val_steps= 100)
 
