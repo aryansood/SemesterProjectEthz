@@ -15,7 +15,7 @@ import zipfile
 def return_front3_cameras(data: wod_e2ed_pb2.E2EDFrame):
   image_list = []
   calibration_list = []
-  order = [4,2,1,3,5]
+  order = [2,1,3]
   for camera_name in order:
     for index, image_content in enumerate(data.frame.images):
       if image_content.name == camera_name:
@@ -65,6 +65,7 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
   rear_image_list = []
   driving_intent = ""
   resize_factor = 5
+  num_intent = None
 
   direction_dist = {
      0: "UNKNOWN",
@@ -83,6 +84,7 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
           past_state_traj = np.stack([data.past_states.pos_x, data.past_states.pos_y, np.zeros_like(data.past_states.pos_x)], axis=1)
           
           driving_intent = direction_dist[data.intent]
+          num_intent = data.intent
           
           front3_camera_image_list, front3_camera_calibration_list = return_front3_cameras(data)  
           front_concatenated = np.concatenate(front3_camera_image_list, axis=1)
@@ -101,16 +103,15 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
   next_state_traj = np.array(next_state_traj)
   past_state_traj = np.array(past_state_traj)
 
-  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent
+  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent
    
-
 
 class WaymoE2EDatasetTrainingAnnotated(Dataset):
     def __init__(self, data_path, seq_len, is_fut_traj = False):
         super().__init__()
 
         self.data_path = data_path
-        self.zip_annot_path = "data/waymo_annot.zip"
+        self.zip_annot_path = "data/waymo_annot_3B.zip"
 
         self.zip_ref_annot = zipfile.ZipFile(self.zip_annot_path, 'r')
         self.list_annotated_files = [f for f in self.zip_ref_annot.namelist() if not f.endswith('/')]
@@ -126,18 +127,18 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
     def __getitem__(self, index):
         
         file_data_path_name = os.path.splitext(self.list_annotated_files[index])[0]
-        video_idf = os.path.basename(os.path.dirname(file_data_path_name))
+        video_idf = os.path.basename(file_data_path_name)#os.path.dirname(file_data_path_name))
+        video_idf = video_idf.split('-')[0]
         video_data_path = os.path.join(self.data_path, video_idf)
         file_data_names = sorted(os.listdir(os.path.join(self.data_path, video_idf)))
         filename_index_name = f"{os.path.basename(file_data_path_name)}.bin"
         interval = file_data_names.index(filename_index_name)
-        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent = return_objects(interval-self.seq_len+1, interval+1, video_data_path, file_data_names)
+        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent = return_objects(interval-self.seq_len+1, interval+1, video_data_path, file_data_names)
 
         annotated_data = ""
         with self.zip_ref_annot.open(self.list_annotated_files[index]) as file_annot:
            annotated_data = np.load(file_annot, allow_pickle=True)
 
-        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(past_state_traj))
         indices = [0, 3, 7, 11, 15, 19]
         next_state_traj_5 = next_state_traj[indices]
 
@@ -148,10 +149,11 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
             clean_string = clean_string[:-3].strip()
 
         np.set_printoptions(suppress=True)
+        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)))
         gt_label = json.loads(str(clean_string))
         
         if(self.is_fut_traj):
-           gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 3).tolist()
+           gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 1).tolist()
         gt_label = json.dumps(gt_label)
 
         message_to_pass = [{
@@ -166,7 +168,7 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
             "content": [{"type": "text", "text": gt_label}],
         }
         ]
-        return front_image_list, message_to_pass, past_state_traj, next_state_traj 
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, num_intent
     
 class WaymoE2EDatasetTraining(Dataset):
     def __init__(self, data_path, seq_len):
@@ -185,7 +187,7 @@ class WaymoE2EDatasetTraining(Dataset):
 
         interval = random.randint(0, len(file_data_names)-self.seq_len)
 
-        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent = return_objects(interval, interval+self.seq_len, file_data_path, file_data_names)
+        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent = return_objects(interval, interval+self.seq_len, file_data_path, file_data_names)
 
         indices = [0, 3, 7, 11, 15, 19]
         next_state_traj_5 = next_state_traj[indices]
@@ -194,7 +196,7 @@ class WaymoE2EDatasetTraining(Dataset):
         gt_label = {"traj_fut": np.round(next_state_traj_5[..., 0:2], 3).tolist()}
         gt_label = json.dumps(gt_label)
 
-        prompt_to_use = training_prompt_waymo_direct_traj(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 3)))
+        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 3)))
 
         message_to_pass = [{
         "role": "user",
@@ -203,50 +205,72 @@ class WaymoE2EDatasetTraining(Dataset):
             {"type": "text", "text": prompt_to_use },
         ],
         }
-        ,{
-            "role": "assistant",
-            "content": [{"type": "text", "text": gt_label}],
-        }
+        # ,{
+        #     "role": "assistant",
+        #     "content": [{"type": "text", "text": gt_label}],
+        # }
         ]
-        return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, message_to_pass
+        name = file_data_names[interval+self.seq_len-1]
+        name, ext = os.path.splitext(name)
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, name
     
-class WaymoE2EDatasetLabeler(Dataset):
-    def __init__(self, data_path, seq_len, self_cur_idx = 10):
-        super().__init__()
-        self.data_path = data_path
-        self.dir_list = os.listdir(data_path)
-        self.seq_len = seq_len
 
-    def __len__(self):
-        return len(self.dir_list)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
-    def __getitem__(self, index):
-        data_point_name = self.dir_list[index]
-        file_data_path = os.path.join(self.data_path, self.dir_list[index])
-        file_data_names = sorted(os.listdir(file_data_path))
+# class WaymoE2EDatasetLabeler(Dataset):
+#     def __init__(self, data_path, seq_len, self_cur_idx = 10):
+#         super().__init__()
+#         self.data_path = data_path
+#         self.dir_list = os.listdir(data_path)
+#         self.seq_len = seq_len
 
-        interval = self.self_cur_idx*10
-        interval = random.randint(interval, interval+10-self.seq_len)
-        if(interval >= len(file_data_names)-10):
-           interval = len(file_data_names)-self.seq_len-10
+#     def __len__(self):
+#         return len(self.dir_list)
+    
+#     def __getitem__(self, index):
+#         data_point_name = self.dir_list[index]
+#         file_data_path = os.path.join(self.data_path, self.dir_list[index])
+#         file_data_names = sorted(os.listdir(file_data_path))
 
-        last_file_name = file_data_names[interval+self.seq_len-1]
-        front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent = return_objects(interval, interval+self.seq_len, file_data_path, file_data_names)
+#         interval = self.self_cur_idx*10
+#         interval = random.randint(interval, interval+10-self.seq_len)
+#         if(interval >= len(file_data_names)-10):
+#            interval = len(file_data_names)-self.seq_len-10
 
-        np.set_printoptions(precision=4, suppress=True)
+#         last_file_name = file_data_names[interval+self.seq_len-1]
+#         front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent = return_objects(interval, interval+self.seq_len, file_data_path, file_data_names)
 
-        prompt_to_use = training_prompt(np.array_str(past_state_traj), drving_intent, np.array_str(next_state_traj))
+#         np.set_printoptions(precision=4, suppress=True)
 
-        indices = [0, 3, 7, 11, 15, 19]
-        #next_state_traj_5 = next_state_traj[indices]
+#         prompt_to_use = training_prompt_waymo(np.array_str(past_state_traj), drving_intent, np.array_str(next_state_traj))
 
-        message_to_pass = [{
-        "role": "user",
-        "content": [
-            {"type": "video", "video": ""},
-            {"type": "text", "text": prompt_to_use },
-        ],
-        }
-        ]
+#         indices = [0, 3, 7, 11, 15, 19]
+#         #next_state_traj_5 = next_state_traj[indices]
 
-        return front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent, message_to_pass, last_file_name
+#         message_to_pass = [{
+#         "role": "user",
+#         "content": [
+#             {"type": "video", "video": ""},
+#             {"type": "text", "text": prompt_to_use },
+#         ],
+#         }
+#         ]
+#         return front_image_list, rear_image_list, next_state_traj, past_state_traj, drving_intent, message_to_pass, last_file_name

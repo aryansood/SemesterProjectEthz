@@ -31,12 +31,14 @@ class QwenFineTunedModelText(nn.Module):
         for param in self.peft_model.parameters():
             param.requires_grad = True
 
-        for name, param in self.peft_model.named_parameters():
-            if param.requires_grad:
-                print(f"{name}: requires_grad = {param.requires_grad}")
+        # for name, param in self.peft_model.named_parameters():
+        #     if param.requires_grad:
+        #         print(f"{name}: requires_grad = {param.requires_grad}")
 
         self.peft_model.to(device)
         self.is_training = is_training
+        # for name, module in self.model.named_modules():
+        #     print(name)
 
     def prepare_input_for_training(self, messages, images, videos):
         
@@ -85,16 +87,63 @@ class QwenFineTunedModelText(nn.Module):
         return outputs
     
     def loss_validation(self, pred, target):
-        loss_diff = torch.sqrt(torch.square(pred-target).sum(dim = -1)).mean(dim = 0)
+        loss_diff = torch.sqrt(torch.square(pred-target).sum(dim = -1))
         return loss_diff
 
     def validate(self, x):
-        batch, labels = self.prepare_input_for_training(x["messages"], None, x["front_images"])
+        #batch, labels = self.prepare_input_for_training(x["messages"], None, x["front_images"])
         with torch.no_grad():
-            with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
-                outputs = self.peft_model(**batch)
-                loss_value_val = self.loss(outputs.logits, labels)
-        return loss_value_val.item()
+            loss_avg= self.validate_traj_generate(x)
+            ade_5_second = torch.mean(loss_avg).item()
+            # with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
+            #     outputs = self.peft_model(**batch)
+            #     loss_value_val = self.loss(outputs.logits, labels)
+        #return loss_value_val.item()
+        return ade_5_second
+
+    def validate_traj_generate(self, batch_input, max_new_tokens = 400):
+        self.is_training = False
+        input_ids = self.prepare_input_for_training(batch_input["messages"], None, batch_input["front_images"])
+        traj_fut_opt = np.array(batch_input["next_state_traj"])
+        l = 0
+        with torch.no_grad():
+            outputs = self.peft_model.generate(**input_ids, max_new_tokens=max_new_tokens)
+            generated_ids_trimmed = [
+            out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids.input_ids, outputs)
+            ]
+            output_text = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+            #print(output_text)
+            traj_list_gt = []
+            traj_list_pred = []
+            for el in output_text:
+                clean_string = str(el).strip()
+                if clean_string.startswith("```json"):
+                    clean_string = clean_string[len("```json"):].strip()
+                if clean_string.endswith("```"):
+                    clean_string = clean_string[:-3].strip()
+                gt_label = json.loads(str(clean_string))
+                arr = np.array(gt_label['traj_fut'])
+                index = [0, 3, 7, 11, 15, 19]
+                cs_x = CubicSpline(index, arr[...,0])
+                cs_y = CubicSpline(index, arr[...,1])
+                t_high = np.arange(0, 20)
+                x_high = cs_x(t_high)[:, None]
+                y_high = cs_y(t_high)[:, None]
+                traj_pred = np.concatenate([x_high, y_high], axis = -1)
+                traj_list_gt.append(traj_fut_opt[l][...,0:2])
+                traj_list_pred.append(traj_pred)
+                l += 1
+            traj_list_gt = torch.from_numpy(np.array(traj_list_gt))
+            traj_list_pred = torch.from_numpy(np.array(traj_list_pred))
+            # plt.figure()
+            # plt.xlim(-20,20)
+            # plt.plot(traj_list_gt[0][...,1], traj_list_gt[0][...,0], color='red')
+            # plt.plot(traj_list_pred[0][...,1], traj_list_pred[0][...,0], color='blue')
+            # plt.savefig("/cluster/home/arsood/Semester_Project_Official/plot.png")
+            self.is_training = True
+            loss_avg = self.loss_validation(traj_list_pred, traj_list_gt)
+        return loss_avg
+
 
     def save(self, path_to_save):
         self.peft_model.save_pretrained(path_to_save, safe_serialization=True)
@@ -104,7 +153,7 @@ class QwenFineTunedModelText(nn.Module):
         model_combined.train()
         model_combined.enable_adapter_layers()
         return model_combined
-    
+        
     def generate(self, batch_input, max_new_tokens = 400):
         self.is_training = False
         input_ids = self.prepare_input_for_training(batch_input["messages"], None, batch_input["front_images"])
@@ -114,6 +163,5 @@ class QwenFineTunedModelText(nn.Module):
         ]
         output_text = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         return output_text
-
     
     

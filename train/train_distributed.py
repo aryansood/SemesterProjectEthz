@@ -11,6 +11,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 #torchrun --nnodes=2 --nproc_per_node=2 --node_rank=0 --master_addr=10.205.9.16 --master_port=29501 post_fine_tune_waymo.py
+#tensorboard --logdir=logs/fit --port=6006
+#torchrun --nnodes=1 --nproc_per_node=2 --node_rank=0 --master_port=29501 post_fine_tune_waymo.py
 
 def set_up_dist():
     local_rank = int(os.environ["LOCAL_RANK"])
@@ -57,12 +59,12 @@ def trainer(
     num_epoch, 
     collate_fn=None,
     optimizer_class=torch.optim.AdamW, 
-    lr=1e-5, 
+    lr=1e-4,
     weight_decay=0.0,
     scheduler_fn=get_cosine_schedule_with_warmup,
     val_dataset = None,
     val_steps = None,
-    max_val_step = 30,
+    max_val_step = 10,
     tensor_board_path = None,
     save_val_dest_path = None,
     save_final_dest_path = None
@@ -77,7 +79,7 @@ def trainer(
 
     val_loader = None
     if val_dataset is not None:
-        val_loader = DataLoader(val_dataset, batch_size=8, collate_fn=collate_fn, shuffle=False)
+        val_loader = DataLoader(val_dataset, batch_size=10, collate_fn=collate_fn, shuffle=True)
     
     if(rank == 0):
         writer = SummaryWriter(tensor_board_path)
@@ -92,18 +94,25 @@ def trainer(
             loss_value.backward()
             optimizer.step()
             scheduler.step()
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
+
+            loss_scalar = loss_value.item()
+
+            del outputs, loss_value
 
             tot_steps = len(training_loader)*epoch + step
             if (rank == 0):
-                writer.add_scalar("Loss/train", loss_value.item(), tot_steps)
+                writer.add_scalar("Loss/train", loss_scalar, tot_steps)
                 writer.add_scalar("Val/train", best_val_loss, tot_steps)
             
             if (rank == 0 and val_loader and (tot_steps % val_steps == 0)):
-                loss_avg = validation(model, val_loader, max_step_val = max_val_step)
+                with torch.no_grad():
+                    loss_avg = validation(model, val_loader, max_step_val = max_val_step)
                 if(loss_avg < best_val_loss):
                     model.module.save(save_val_dest_path)
+                    #torch.save(model.module.dino_traj_decoder.state_dict(), save_val_dest_path)
                     best_val_loss = loss_avg
                 torch.cuda.empty_cache()
 
     model.module.save(save_final_dest_path)
+    #torch.save(model.module.dino_traj_decoder.state_dict(), save_final_dest_path)

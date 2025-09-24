@@ -13,7 +13,7 @@ import json
 def return_front3_cameras(data: wod_e2ed_pb2.E2EDFrame):
   image_list = []
   calibration_list = []
-  order = [4,2,1,3,5]
+  order = [2,1,3]
   for camera_name in order:
     for index, image_content in enumerate(data.frame.images):
       if image_content.name == camera_name:
@@ -51,6 +51,64 @@ def val_collate_waymo(batch):
   batch_process = [message_to_pass, front_images, past_state_traj, traj_rat_score, traj_rater, next_state_traj]
   return batch_process
 
+# def return_objects(interval_start, interval_end, file_data_path, file_data_names):
+
+#   past_state_traj = None
+#   next_state_traj = None
+#   front_image_list = []
+#   rear_image_list = []
+#   driving_intent = ""
+#   resize_factor = 5
+#   traj_rater = []
+#   traj_rat_score = []
+#   num_intent = None
+
+#   direction_dist = {
+#     0: "UNKNOWN",
+#     1: "GO_STRAIGHT",
+#     2: "GO_LEFT",
+#     3: "GO_RIGHT"
+#   }
+
+#   for el in range(interval_start, interval_end):
+#       filepath = os.path.join(file_data_path, file_data_names[el])
+#       with open(filepath, 'rb') as file:
+#           data_bin = file.read()
+#           data = wod_e2ed_pb2.E2EDFrame()
+#           data.ParseFromString(data_bin)
+#           next_state_traj = np.stack([data.future_states.pos_x, data.future_states.pos_y, np.zeros_like(data.future_states.pos_x)], axis=1)
+#           past_state_traj = np.stack([data.past_states.pos_x, data.past_states.pos_y, np.zeros_like(data.past_states.pos_x)], axis=1)
+          
+#           driving_intent = direction_dist[data.intent]
+#           num_intent = data.intent
+          
+#           front3_camera_image_list, front3_camera_calibration_list = return_front3_cameras(data)  
+#           front_concatenated = np.concatenate(front3_camera_image_list, axis=1)
+#           front_concatenated = cv2.resize(front_concatenated, (int(front_concatenated.shape[1]/resize_factor), int(front_concatenated.shape[0]/resize_factor)), interpolation=cv2.INTER_AREA)
+#           front_concatenated = cv2.resize(front_concatenated, (int(512), int(512)), interpolation=cv2.INTER_AREA) 
+#           front_image_list.append(front_concatenated)
+          
+#           rear3_camera_image_list, rear3_camera_calibration_list = return_rear3_cameras(data)
+#           rear3_camera_image_list[1] = cv2.resize(rear3_camera_image_list[1], (rear3_camera_image_list[0].shape[1], rear3_camera_image_list[0].shape[0]))
+#           rear_concatenated = np.concatenate(rear3_camera_image_list, axis=1)
+#           rear_concatenated = cv2.resize(rear_concatenated, (int(rear_concatenated.shape[1]/resize_factor), int(rear_concatenated.shape[0]/resize_factor)), interpolation=cv2.INTER_AREA) 
+#           rear_image_list.append(rear_concatenated)
+#           if(el == interval_end-1):
+#             for el_traj in data.preference_trajectories:
+#                traj_rat_point = np.stack([el_traj.pos_x, el_traj.pos_y], axis=-1)
+#                traj_rater.append(traj_rat_point)
+#                traj_rat_score.append(el_traj.preference_score)
+    
+  
+#   front_image_list = np.array(front_image_list)
+#   next_state_traj = np.array(next_state_traj)
+#   past_state_traj = np.array(past_state_traj)
+#   #traj_rater = np.concatenate(traj_rater, axis=0)
+#   traj_rat_score = np.array(traj_rat_score)
+
+#   return front_image_list, next_state_traj, past_state_traj, driving_intent, traj_rater, traj_rat_score, num_intent
+
+
 def return_objects(interval_start, interval_end, file_data_path, file_data_names):
 
   past_state_traj = None
@@ -59,11 +117,10 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
   rear_image_list = []
   driving_intent = ""
   resize_factor = 5
-  traj_rater = []
-  traj_rat_score = []
+  num_intent = None
 
   direction_dist = {
-    0: "UNKNOWN",
+     0: "UNKNOWN",
     1: "GO_STRAIGHT",
     2: "GO_LEFT",
     3: "GO_RIGHT"
@@ -79,6 +136,7 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
           past_state_traj = np.stack([data.past_states.pos_x, data.past_states.pos_y, np.zeros_like(data.past_states.pos_x)], axis=1)
           
           driving_intent = direction_dist[data.intent]
+          num_intent = data.intent
           
           front3_camera_image_list, front3_camera_calibration_list = return_front3_cameras(data)  
           front_concatenated = np.concatenate(front3_camera_image_list, axis=1)
@@ -90,20 +148,14 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
           rear_concatenated = np.concatenate(rear3_camera_image_list, axis=1)
           rear_concatenated = cv2.resize(rear_concatenated, (int(rear_concatenated.shape[1]/resize_factor), int(rear_concatenated.shape[0]/resize_factor)), interpolation=cv2.INTER_AREA) 
           rear_image_list.append(rear_concatenated)
-          if(el == interval_end-1):
-            for el_traj in data.preference_trajectories:
-               traj_rat_point = np.stack([el_traj.pos_x, el_traj.pos_y], axis=-1)
-               traj_rater.append(traj_rat_point)
-               traj_rat_score.append(el_traj.preference_score)
     
   
   front_image_list = np.array(front_image_list)
+  rear_image_list = np.array(rear_image_list)
   next_state_traj = np.array(next_state_traj)
   past_state_traj = np.array(past_state_traj)
-  #traj_rater = np.concatenate(traj_rater, axis=0)
-  traj_rat_score = np.array(traj_rat_score)
 
-  return front_image_list, next_state_traj, past_state_traj, driving_intent, traj_rater, traj_rat_score
+  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent
    
 class WaymoE2EDatasetVal(Dataset):
     def __init__(self, data_path, seq_len):
@@ -124,12 +176,11 @@ class WaymoE2EDatasetVal(Dataset):
 
         index_to_start = file_data_names.index(self.list_val_rater[index])
 
-        front_image_list, next_state_traj, past_state_traj, drving_intent, traj_rater, traj_rat_score = return_objects(index_to_start-self.seq_len+1, index_to_start+1, file_data_path, file_data_names)
+        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent = return_objects(index_to_start-self.seq_len+1, index_to_start+1, file_data_path, file_data_names)
 
         np.set_printoptions(suppress=True)
 
-        prompt_to_use = training_prompt_waymo(drving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 3)))
-
+        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 3)))
         message_to_pass = [{
         "role": "user",
         "content": [
@@ -138,4 +189,4 @@ class WaymoE2EDatasetVal(Dataset):
         ],
         }
         ]
-        return front_image_list, message_to_pass, past_state_traj, next_state_traj
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, num_intent
