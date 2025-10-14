@@ -88,7 +88,10 @@ def return_objects(start_point, file_path_video, file_path_states):
         driving_intent = 'GO_LEFT'
         num_intent = 2
     
-    return video_array_resize, driving_intent, transform_points_past, transform_points, num_intent
+    cur_vel = np.array(states_array[start_point][str(start_point)]['velocities_calib'])[0:2]
+    cur_acc = np.array(states_array[start_point][str(start_point)]['accelerations_calib'])[0:2]
+    
+    return video_array_resize, driving_intent, transform_points_past, transform_points, num_intent, cur_vel, cur_acc
 
 class CovlaDatasetTrainingAnnotated(Dataset):
     def __init__(self, data_path_videos, data_path_states, seq_len = 4, is_fut_traj = False):
@@ -101,7 +104,7 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         self.list_states = os.listdir(self.data_path_states)
         self.list_states = sorted(self.list_states)
 
-        self.zip_annot_path = "data/covla_annot_3B.zip"
+        self.zip_annot_path = "data/covla_annot.zip"
         self.zip_ref_annot = zipfile.ZipFile(self.zip_annot_path, 'r')
         self.list_annotated_files = [f for f in self.zip_ref_annot.namelist() if not f.endswith('/')]
 
@@ -112,16 +115,16 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         return len(self.list_annotated_files)
     
     def __getitem__(self, index):
-        file_data_path_name = os.path.splitext(self.list_annotated_files[index])[0]#os.path.splitext(self.list_annotated_files[index])[0]
-        drive_seg_idf = os.path.basename(file_data_path_name)#os.path.dirname(file_data_path_name))
+        file_data_path_name = os.path.splitext(self.list_annotated_files[index])[0]
+        drive_seg_idf = os.path.basename(os.path.dirname(file_data_path_name))#file_data_path_name
         drive_seg_idf = drive_seg_idf.split("_")[0]
 
         video_data_path = f"{os.path.join(self.data_path_videos, drive_seg_idf)}.mp4"
         state_data_path = f"{os.path.join(self.data_path_states, drive_seg_idf)}.jsonl"
 
-        start_point = int(self.list_annotated_files[index].split("-")[-1].split("_")[-1].split(".")[0])#int(self.list_annotated_files[index].split("-")[-1].split(".")[0])
+        start_point = int(self.list_annotated_files[index].split("-")[-1].split(".")[0])#int(self.list_annotated_files[index].split("-")[-1].split("_")[-1].split(".")[0])#
         
-        front_image_list, driving_intent, past_state_traj, next_state_traj, num_intent = return_objects(start_point, video_data_path, state_data_path)
+        front_image_list, driving_intent, past_state_traj, next_state_traj, num_intent, cur_vel, cur_acc = return_objects(start_point, video_data_path, state_data_path)
 
         annotated_data = ""
         with self.zip_ref_annot.open(self.list_annotated_files[index]) as file_annot:
@@ -139,11 +142,10 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         np.set_printoptions(suppress=True)
         gt_label = json.loads(str(clean_string))
         if(self.is_fut_traj):
-           gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 1).tolist()
+           gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 2).tolist()
         gt_label = json.dumps(gt_label)
         
-        prompt_to_use = training_prompt_covla(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)))
-        
+        prompt_to_use = training_prompt_covla(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), np.array_str(np.round(cur_vel, 4)), np.array_str(np.round(cur_acc, 4)))
         message_to_pass = [{
         "role": "user",
         "content": [
@@ -156,6 +158,8 @@ class CovlaDatasetTrainingAnnotated(Dataset):
             "content": [{"type": "text", "text": gt_label}],
         }
         ]
+        print(cur_vel) 
+        print(cur_acc)
         return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, num_intent
     
 
@@ -184,7 +188,7 @@ class CovlaDatasetTraining(Dataset):
 
         start_point = random.randint(80,460)
 
-        front_image_list, driving_intent, past_state_traj, next_state_traj, num_intent = return_objects(start_point, file_path_video, file_path_states)
+        front_image_list, driving_intent, past_state_traj, next_state_traj, num_intent, cur_vel, cur_acc = return_objects(start_point, file_path_video, file_path_states)
         
         indices = [0, 3, 7, 11, 15, 19]
         next_state_traj_5 = next_state_traj[indices]
@@ -193,7 +197,7 @@ class CovlaDatasetTraining(Dataset):
         gt_label = {"traj_fut": np.round(next_state_traj_5[..., 0:2], 2).tolist()}
         gt_label = json.dumps(gt_label)
 
-        prompt_to_use = training_prompt_covla(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 3)))
+        prompt_to_use = training_prompt_covla(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), np.array_str(np.round(cur_vel, 4)), np.array_str(np.round(cur_acc, 4)))
 
         message_to_pass = [{
         "role": "user",
@@ -209,7 +213,7 @@ class CovlaDatasetTraining(Dataset):
         ]
         name, ext = os.path.splitext(self.list_videos[index])
         name = f"{name}_{start_point}"
-        return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, name
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, num_intent
 
 
 

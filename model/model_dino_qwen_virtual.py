@@ -86,7 +86,6 @@ class Traj_Decoder(nn.Module):
         features = torch.concat([batch_memory, ego_past_traj, ego_intent_traj], dim = 1)
         hidden_layer = self.transformer_decoder(x, features)
         out = self.last_emb(hidden_layer)
-        print(self.virtual_tokens[0])
         return out
 
 class PipelineDino(nn.Module):
@@ -96,14 +95,12 @@ class PipelineDino(nn.Module):
         self.dino_traj_decoder = Traj_Decoder()
     
     def forward(self, batch):
-        with torch.no_grad():
-            visual_feature = self.dino_encoder(batch)
+        #with torch.no_grad():
+        visual_feature = self.dino_encoder(batch)
         ego_feature = torch.tensor(np.array(batch["past_state_traj"]), dtype=torch.float32).to('cuda')
         ego_intent = torch.tensor(np.array(batch["index_intent"])).unsqueeze(dim = 1).to('cuda')
         out = self.dino_traj_decoder(visual_feature, ego_feature, ego_intent).to('cuda')
         predict_traj = torch.tensor(np.array(batch["next_state_traj"])).to('cuda')
-        # indices = [0, 3, 7, 11, 15, 19]
-        # predict_traj = predict_traj[:, indices]
         loss = self.loss_ade(out, predict_traj)
         return out, loss
 

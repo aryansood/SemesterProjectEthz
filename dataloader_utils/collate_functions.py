@@ -8,7 +8,9 @@ def train_collate(batch):
   past_traj = [el[2][...,0:2] for el in batch]
   fut_traj = [el[3][...,0:2] for el in batch]
   index_intent = [el[4] for el in batch]
-  file_name = [el[5] for el in batch]
+  front_calib_matrix = [el[5] for el in batch]
+  # front3_camera_image_list = [el[6] for el in batch]
+  # vehicle_pose = [el[7] for el in batch]
   batch_dict = {
         "messages": messages,
         "front_images": front_images,
@@ -16,6 +18,8 @@ def train_collate(batch):
         "next_state_traj": fut_traj,
         "front_images_no" : front_images_no,
         "index_intent" : index_intent,
-        "file_name" : file_name,
+        "front_calib_matrix" : front_calib_matrix,
+        # "front3_camera_image_list": front3_camera_image_list,
+        # "vehicle_pose": vehicle_pose,
     }
   return batch_dict

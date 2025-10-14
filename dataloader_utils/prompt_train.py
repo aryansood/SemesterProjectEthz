@@ -1,10 +1,12 @@
-def training_prompt_waymo(intent, traj_past):
+def training_prompt_waymo(intent, traj_past, cur_vel, cur_acc):
+    #- 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
     prompt_to_pass = """
     You are an expert driver.
     Input:
     - 4 frames of multi-view images images collected from the ego-vehicle over the last second
     - Current high-level intent """+intent+"""
-    - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
+    - Current velocity as [vx, vy]: """+cur_vel+"""
+    - Current acceleration as [ax, ay]: """+cur_acc+"""
     Task 1: Critical Objects and Conditions Detection
     Decide whether at least one critical instance of each class could influence the ego-vehicle’s
     future path (no omissions). A vehicle can be a car, bus, truck, motorcyclist, scooter, etc.
@@ -77,13 +79,15 @@ def training_prompt_waymo(intent, traj_past):
     return prompt_to_pass
 
 
-def training_prompt_covla(intent, traj_past):
+def training_prompt_covla(intent, traj_past, cur_vel, cur_acc):
+    #- 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
     prompt_to_pass = """
     You are an expert left-hand-side driver.
     Input:
     - 4 frames of front-view images images collected from the ego-vehicle over the last second
     - Current high-level intent """+intent+"""
-    - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
+    - Current velocity as [vx, vy]: """+cur_vel+"""
+    - Current acceleration as [ax, ay]: """+cur_acc+"""
     Task 1: Critical Objects and Conditions Detection
     Decide whether at least one critical instance of each class could influence the ego-vehicle’s
     future path (no omissions). A vehicle can be a car, bus, truck, motorcyclist, scooter, etc.

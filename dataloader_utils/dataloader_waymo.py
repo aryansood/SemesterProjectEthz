@@ -61,6 +61,8 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
 
   past_state_traj = None
   next_state_traj = None
+  cur_vel =  None
+  cur_acc = None
   front_image_list = []
   rear_image_list = []
   driving_intent = ""
@@ -96,6 +98,11 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
           rear_concatenated = np.concatenate(rear3_camera_image_list, axis=1)
           rear_concatenated = cv2.resize(rear_concatenated, (int(rear_concatenated.shape[1]/resize_factor), int(rear_concatenated.shape[0]/resize_factor)), interpolation=cv2.INTER_AREA) 
           rear_image_list.append(rear_concatenated)
+
+          cur_vel = np.stack([data.past_states.vel_x[-1], data.past_states.vel_y[-1]])
+          cur_acc = np.stack([data.past_states.accel_x[-1], data.past_states.accel_y[-1]])
+
+          
     
   
   front_image_list = np.array(front_image_list)
@@ -103,7 +110,7 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
   next_state_traj = np.array(next_state_traj)
   past_state_traj = np.array(past_state_traj)
 
-  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent
+  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc
    
 
 class WaymoE2EDatasetTrainingAnnotated(Dataset):
@@ -111,7 +118,7 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
         super().__init__()
 
         self.data_path = data_path
-        self.zip_annot_path = "data/waymo_annot_3B.zip"
+        self.zip_annot_path = "data/waymo_annot.zip"
 
         self.zip_ref_annot = zipfile.ZipFile(self.zip_annot_path, 'r')
         self.list_annotated_files = [f for f in self.zip_ref_annot.namelist() if not f.endswith('/')]
@@ -127,13 +134,13 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
     def __getitem__(self, index):
         
         file_data_path_name = os.path.splitext(self.list_annotated_files[index])[0]
-        video_idf = os.path.basename(file_data_path_name)#os.path.dirname(file_data_path_name))
+        video_idf = os.path.basename(os.path.dirname(file_data_path_name))#file_data_path_name
         video_idf = video_idf.split('-')[0]
         video_data_path = os.path.join(self.data_path, video_idf)
         file_data_names = sorted(os.listdir(os.path.join(self.data_path, video_idf)))
         filename_index_name = f"{os.path.basename(file_data_path_name)}.bin"
         interval = file_data_names.index(filename_index_name)
-        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent = return_objects(interval-self.seq_len+1, interval+1, video_data_path, file_data_names)
+        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc = return_objects(interval-self.seq_len+1, interval+1, video_data_path, file_data_names)
 
         annotated_data = ""
         with self.zip_ref_annot.open(self.list_annotated_files[index]) as file_annot:
@@ -149,13 +156,11 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
             clean_string = clean_string[:-3].strip()
 
         np.set_printoptions(suppress=True)
-        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)))
+        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), np.array_str(np.round(cur_vel, 4)), np.array_str(np.round(cur_acc, 4)))
         gt_label = json.loads(str(clean_string))
-        
         if(self.is_fut_traj):
-           gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 1).tolist()
+           gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 2).tolist()
         gt_label = json.dumps(gt_label)
-
         message_to_pass = [{
         "role": "user",
         "content": [
@@ -187,7 +192,7 @@ class WaymoE2EDatasetTraining(Dataset):
 
         interval = random.randint(0, len(file_data_names)-self.seq_len)
 
-        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent = return_objects(interval, interval+self.seq_len, file_data_path, file_data_names)
+        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc = return_objects(interval, interval+self.seq_len, file_data_path, file_data_names)
 
         indices = [0, 3, 7, 11, 15, 19]
         next_state_traj_5 = next_state_traj[indices]
@@ -196,7 +201,7 @@ class WaymoE2EDatasetTraining(Dataset):
         gt_label = {"traj_fut": np.round(next_state_traj_5[..., 0:2], 3).tolist()}
         gt_label = json.dumps(gt_label)
 
-        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 3)))
+        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), np.array_str(np.round(cur_vel, 4)), np.array_str(np.round(cur_acc, 4)))
 
         message_to_pass = [{
         "role": "user",
@@ -212,7 +217,7 @@ class WaymoE2EDatasetTraining(Dataset):
         ]
         name = file_data_names[interval+self.seq_len-1]
         name, ext = os.path.splitext(name)
-        return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, name
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, num_intent
     
 
 
