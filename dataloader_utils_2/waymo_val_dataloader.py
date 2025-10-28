@@ -6,8 +6,11 @@ import random
 import numpy as np
 import tensorflow as tf
 import cv2
-import matplotlib.pyplot as plt
-from collections import defaultdict
+import json
+from waymo_open_dataset.wdl_limited.camera.ops import py_camera_model_ops
+from waymo_open_dataset import dataset_pb2 as open_dataset
+from waymo_open_dataset.protos import end_to_end_driving_data_pb2 as wod_e2ed_pb2
+
 
 def return_front3_cameras(data: wod_e2ed_pb2.E2EDFrame):
   image_list = []
@@ -39,6 +42,56 @@ def return_rear3_cameras(data: wod_e2ed_pb2.E2EDFrame):
 
   return image_list, calibration_list
 
+def collate_val(batch):
+  front_images =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
+  front_images_no =[torch.from_numpy(el[0]) for el in batch]
+  messages = [el[1] for el in batch]
+  past_traj = [el[2][...,0:2] for el in batch]
+  fut_traj = [el[3][...,0:2] for el in batch]
+  index_intent = [el[4] for el in batch]
+  front_calib_matrix = [el[5] for el in batch]
+  rater_traj = [el[6] for el in batch]
+  rater_traj_score = [el[7] for el in batch]
+  batch_dict = {
+        "messages": messages,
+        "front_images": front_images,
+        "past_state_traj": past_traj,
+        "next_state_traj": fut_traj,
+        "front_images_no" : front_images_no,
+        "index_intent" : index_intent,
+        "front_calib_matrix" : front_calib_matrix,
+        "rater_traj": rater_traj,
+        "rater_traj_score": rater_traj_score,
+    }
+  return batch_dict
+
+def project_vehicle_to_image(vehicle_pose, calibration, points):
+  pose_matrix = np.array(vehicle_pose.transform).reshape(4, 4)
+  world_points = np.zeros_like(points)
+  for i, point in enumerate(points):
+    cx, cy, cz, _ = np.matmul(pose_matrix, [*point, 1])
+    world_points[i] = (cx, cy, cz)
+  extrinsic = tf.reshape(
+      tf.constant(list(calibration.extrinsic.transform), dtype=tf.float32),
+      [4, 4])
+  intrinsic = tf.constant(list(calibration.intrinsic), dtype=tf.float32)
+  metadata = tf.constant([
+      calibration.width,
+      calibration.height,
+      open_dataset.CameraCalibration.GLOBAL_SHUTTER,
+  ],
+                         dtype=tf.int32)
+  camera_image_metadata = list(vehicle_pose.transform) + [0.0] * 10
+
+  return py_camera_model_ops.world_to_image(extrinsic, intrinsic, metadata,
+                                            camera_image_metadata,
+                                            world_points).numpy()
+
+def draw_points_on_image(image, points, size, colour):
+  for point in points:
+    cv2.circle(image, (int(point[0]), int(point[1])), size, colour, -1)
+  return image
+
 def return_objects(interval_start, interval_end, file_data_path, file_data_names):
 
   past_state_traj = None
@@ -50,6 +103,9 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
   driving_intent = ""
   resize_factor = 5
   num_intent = None
+  traj_rater = []
+  traj_rat_score = []
+  max_rat = 0
 
   direction_dist = {
      0: "UNKNOWN",
@@ -69,6 +125,7 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
           
           driving_intent = direction_dist[data.intent]
           num_intent = data.intent
+          vehicle_pose = data.frame.images[0].pose
           
           front3_camera_image_list, front3_camera_calibration_list = return_front3_cameras(data)  
           front_concatenated = np.concatenate(front3_camera_image_list, axis=1)
@@ -81,53 +138,43 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
           rear_concatenated = cv2.resize(rear_concatenated, (int(rear_concatenated.shape[1]/resize_factor), int(rear_concatenated.shape[0]/resize_factor)), interpolation=cv2.INTER_AREA) 
           rear_image_list.append(rear_concatenated)
 
+          if(el == interval_end-1):
+            for el_traj in data.preference_trajectories:
+               if(max_rat < el_traj.preference_score):
+                traj_rat_point = np.stack([el_traj.pos_x, el_traj.pos_y], axis=-1)
+                traj_rater = traj_rat_point
+
           cur_vel = np.stack([data.past_states.vel_x[-1], data.past_states.vel_y[-1]])
           cur_acc = np.stack([data.past_states.accel_x[-1], data.past_states.accel_y[-1]])
-
-          
     
   
   front_image_list = np.array(front_image_list)
   rear_image_list = np.array(rear_image_list)
   next_state_traj = np.array(next_state_traj)
   past_state_traj = np.array(past_state_traj)
-
-  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc
+  # traj_rater = np.array(traj_rater)
+  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, front3_camera_calibration_list, vehicle_pose, front3_camera_image_list, cur_vel, cur_acc, traj_rater, traj_rat_score
    
-
-class WaymoE2EDatasetTraining(Dataset):
-    def __init__(self, data_path, seq_len, split_ratio = [0.1, 0.5, 1, 1]):
+class WaymoE2EDatasetVal(Dataset):
+    def __init__(self, data_path, seq_len):
         super().__init__()
-
         self.data_path = data_path
+        self.dir_list = os.listdir(data_path)
         self.seq_len = seq_len
-
-        waymo_split_train = np.load("dataloader_utils_2/train_data_split/waymo_disjoint_set.npy", allow_pickle=True)
-        waymo_split_0_1 = random.sample(waymo_split_train[0], int(len(waymo_split_train[0])* split_ratio[0]) )
-        waymo_split_1_2 = random.sample(waymo_split_train[1], int(len(waymo_split_train[1])* split_ratio[1]) )
-        waymo_split_2_3 = random.sample(waymo_split_train[2], int(len(waymo_split_train[2])* split_ratio[2]) )
-        waymo_split_3_4 = random.sample(waymo_split_train[3], int(len(waymo_split_train[3])* split_ratio[3]) )
-
-        self.waymo_data_set = waymo_split_0_1 + waymo_split_1_2 + waymo_split_2_3 + waymo_split_3_4
-
-        waymo_grouped = defaultdict(list)
-        for key in self.waymo_data_set:
-          dir_name , cur_file = os.path.split(key)
-          waymo_grouped[dir_name].append(key)
-        self.waymo_data_set = sorted(list(waymo_grouped.items()))
+        self.list_val_rater = np.load('dataloader_utils_2/val_rater_score_pos.npy')
 
     def __len__(self):
-        return len(self.waymo_data_set)
+        return len(self.list_val_rater)
     
     def __getitem__(self, index):
-        random_point = random.choice(self.waymo_data_set[index][1])
-        dir_name , cur_file = os.path.split(random_point)
-        dir_loc = os.path.join(self.data_path,dir_name)
-        file_names = os.listdir(dir_loc)
-        file_names = sorted(file_names)
-        interval = file_names.index(cur_file)
-        
-        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc = return_objects(interval-self.seq_len, interval+1, dir_loc, file_names)
+
+        file_name = (os.path.splitext(self.list_val_rater[index])[0]).split("-")[0]
+        file_data_path = os.path.join(self.data_path, file_name)
+        file_data_names = sorted(os.listdir(file_data_path))
+
+        index_to_start = file_data_names.index(self.list_val_rater[index])
+
+        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, front3_camera_calibration_list, vehicle_pose, front3_camera_image_list, cur_vel, cur_acc, traj_rater, traj_rat_score = return_objects(index_to_start-self.seq_len+1, index_to_start+1, file_data_path, file_data_names)
 
         list_time_step = np.arange(0.25 , 5.25, 0.25)
         linear_path_vel_x = (max(0, cur_vel[0])*list_time_step)[:, None]

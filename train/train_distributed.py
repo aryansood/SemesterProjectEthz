@@ -58,7 +58,7 @@ def trainer(
     batch_size, 
     num_epoch, 
     collate_fn=None,
-    optimizer_class=torch.optim.AdamW, 
+    optimizer_class=torch.optim.AdamW,
     lr=1e-4,
     weight_decay=0.0,
     scheduler_fn=get_cosine_schedule_with_warmup,
@@ -79,7 +79,7 @@ def trainer(
 
     val_loader = None
     if val_dataset is not None:
-        val_loader = DataLoader(val_dataset, batch_size=10, collate_fn=collate_fn, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=20, collate_fn=collate_fn, shuffle=True)
     
     if(rank == 0):
         writer = SummaryWriter(tensor_board_path)
@@ -90,7 +90,7 @@ def trainer(
         train_sampler.set_epoch(epoch)
         
         for step, batch in enumerate(tqdm(training_loader, disable=(rank != 0)), start=0):
-            outputs, loss_value = model.module.forward(batch)
+            outputs, loss_value = model(batch)
             loss_value.backward()
             optimizer.step()
             scheduler.step()
@@ -113,6 +113,8 @@ def trainer(
                     #torch.save(model.module.dino_traj_decoder.state_dict(), save_val_dest_path)
                     best_val_loss = loss_avg
                 torch.cuda.empty_cache()
+            print("Train: ", loss_scalar)
+            print("Val: ", best_val_loss)
 
     model.module.save(save_final_dest_path)
     #torch.save(model.module.dino_traj_decoder.state_dict(), save_final_dest_path)
