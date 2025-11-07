@@ -79,7 +79,7 @@ def trainer(
 
     val_loader = None
     if val_dataset is not None:
-        val_loader = DataLoader(val_dataset, batch_size=20, collate_fn=collate_fn, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=10, collate_fn=collate_fn, shuffle=True)
     
     if(rank == 0):
         writer = SummaryWriter(tensor_board_path)

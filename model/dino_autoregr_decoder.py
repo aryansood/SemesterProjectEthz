@@ -118,7 +118,7 @@ class PipiLineDinoAutoregr(nn.Module):
         return loss_ade_value
     
     def save(self, path_to_save):
-        torch.save(self.state_dict(), path_to_save)      
+        torch.save(self.state_dict(), path_to_save)     
         
 
 

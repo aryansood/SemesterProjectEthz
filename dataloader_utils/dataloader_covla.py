@@ -158,8 +158,6 @@ class CovlaDatasetTrainingAnnotated(Dataset):
             "content": [{"type": "text", "text": gt_label}],
         }
         ]
-        print(cur_vel) 
-        print(cur_acc)
         return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, num_intent
     
 

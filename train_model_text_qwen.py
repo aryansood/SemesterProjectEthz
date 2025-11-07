@@ -54,75 +54,80 @@ def draw_points_on_image(image, points, size, colour):
     cv2.circle(image, (int(point[0]), int(point[1])), size, colour, -1)
   return image
 
+#torch.manual_seed(42)
 
-# val_dataset = WaymoE2EDatasetVal(data_waymo_val.data, 1)
-# val_loader = DataLoader(val_dataset, batch_size=20, shuffle = True, collate_fn = collate_val)
-# load_path_model = '/cluster/scratch/arsood/qwen_with_fut_traj_wo_past_traj'
-model = QwenFineTunedModelText()
+# training_covla_annotated = CovlaDatasetTrainingAnnotated(data_covla.video, data_covla.state, 1, is_fut_traj=True)
+# training_waymo_annotated = WaymoE2EDatasetTrainingAnnotated(data_waymo_train.data, 1, is_fut_traj = True)
+# training_data = ConcatDataset([training_covla_annotated, training_waymo_annotated])
 
-torch.manual_seed(42)
+# dataset_size = len(training_data)
+# val_size = int(0.1 * dataset_size)
+# train_size = dataset_size - val_size
 
-training_covla_annotated = CovlaDatasetTraining(data_covla.video, data_covla.state, 4)
-training_waymo_annotated = WaymoE2EDatasetTraining(data_waymo_train.data, 4)
-training_data = ConcatDataset([training_covla_annotated])
-val_loader = DataLoader(training_data, batch_size=1, shuffle = True, collate_fn = train_collate)
+# train_dataset, val_dataset = random_split(training_data, [train_size, val_size])
 
-dataset_size = len(training_data)
-val_size = int(0.1 * dataset_size)
-train_size = dataset_size - val_size
+save_val_dest_path = '/cluster/scratch/arsood/qwen_with_fut_traj_wo_past_traj_6'
+save_final_dest_path = '/cluster/scratch/arsood/qwen_with_fut_traj_wo_past_traj_6'
+tensor_board_path = '/cluster/scratch/arsood/tensor_board_fut_traj_wo_past_traj_6'
+model = QwenFineTunedModelText(save_val_dest_path)
+#trainer(model, train_dataset, 2, 2, train_collate, val_dataset=val_dataset, val_steps= 100, save_val_dest_path = save_val_dest_path, save_final_dest_path = save_final_dest_path, tensor_board_path = tensor_board_path, max_val_step=30)
+val_dataset = WaymoE2EDatasetVal(data_waymo_val.data, 1)
+val_loader = DataLoader(val_dataset, batch_size=5, shuffle = True, collate_fn = collate_val)
 
-train_dataset, val_dataset = random_split(training_data, [train_size, val_size])
+l = 0
+sum_3 = 0
+sum_5 = 0
+list_3 = []
+list_5 = []
+l_every = []
+conta = 0
+# path_to_save = "/cluster/scratch/arsood/save_val_result"
+list_of_sample_traj_to_ret = []
+for batch in tqdm(val_loader):
+  # if np.any(np.abs(batch["next_state_traj"][0][...,1]) > 3):
+  #   plt.figure()
+  #   plt.xlim(-30, 30)
+  #   plt.plot(batch["next_state_traj"][0][...,1], batch["next_state_traj"][0][...,0], color="red")
+  #   plt.savefig("/cluster/home/arsood/Semester_Project_Official/fig_2.png")
+  #   input_l = input("lol")
+    # conta+=1
+    # print(conta)
 
-save_val_dest_path = '/cluster/scratch/arsood/qwen_with_fut_traj_wo_past_traj_2'
-save_final_dest_path = '/cluster/scratch/arsood/qwen_with_fut_traj_wo_past_traj_2'
-tensor_board_path = '/cluster/scratch/arsood/tensor_board_fut_traj_wo_past_traj'
-model = QwenFineTunedModelText()
-trainer(model, training_data, 2, 2, train_collate, val_dataset=val_dataset, val_steps= 100, save_val_dest_path = save_val_dest_path, save_final_dest_path = save_final_dest_path, tensor_board_path = tensor_board_path)
-
-# l = 0
-# sum_3 = 0
-# sum_5 = 0
-# list_3 = []
-# list_5 = []
-# l_every = []
-# conta = 0
-# # path_to_save = "/cluster/scratch/arsood/save_val_result"
-# for batch in tqdm(val_loader):
-#   # if np.any(np.abs(batch["next_state_traj"][0][...,1]) > 3):
-#   #   plt.figure()
-#   #   plt.xlim(-30, 30)
-#   #   plt.plot(batch["next_state_traj"][0][...,1], batch["next_state_traj"][0][...,0], color="red")
-#   #   plt.savefig("/cluster/home/arsood/Semester_Project_Official/fig_2.png")
-#   #   input_l = input("lol")
-#     # conta+=1
-#     # print(conta)
-
-#     loss_avg, pred_traj, output_text = model.validate_traj_generate(batch)
-#     # # print(batch["front_images"][0].shape)
-#     # # print(output_text[0])
-#     # for i in range(0, len(batch["front3_camera_image_list"])):
-#     #   front3_camera_image_list = batch["front3_camera_image_list"][i]
-#     #   front3_camera_calibration_list = batch["front_calib_matrix"][i]
-#     #   vehicle_pose = batch["vehicle_pose"][i]
-#     #   pred_traj_temp = pred_traj[i]
-#     #   next_state_traj_pred = np.stack([pred_traj_temp[...,0], pred_traj_temp[...,1], np.zeros_like(pred_traj_temp[...,0])], axis=1)
-#     #   next_state_gt = batch["next_state_traj"][i]
-#     #   next_state_gt = np.stack([next_state_gt[...,0], next_state_gt[...,1], np.zeros_like(next_state_gt[...,0])], axis=1)
-#     #   for j in range(len(front3_camera_image_list)):
-#     #     waypoints_camera_space = project_vehicle_to_image(vehicle_pose, front3_camera_calibration_list[j], next_state_traj_pred)
-#     #     waypoints_camera_space_second = project_vehicle_to_image(vehicle_pose, front3_camera_calibration_list[j], next_state_gt)
-#     #     front3_camera_image_list[j] = draw_points_on_image(front3_camera_image_list[j], waypoints_camera_space, size=15, colour=(0,255,0))
-#     #     front3_camera_image_list[j] = draw_points_on_image(front3_camera_image_list[j], waypoints_camera_space_second, size=15, colour=(0,0,255))
-#     #   front_concatenated = np.concatenate(front3_camera_image_list, axis=1)
-#     #   list_add = [front_concatenated, output_text[i], batch["index_intent"][i], next_state_gt, next_state_traj_pred]
-#     #   l_every.append(list_add)
-#     #   plt.figure()
-#     #   plt.imshow(front_concatenated)
-#     #   plt.savefig("/cluster/home/arsood/Semester_Project_Official/all_fig.png")
-#     ade_3_second = torch.mean(loss_avg[...,0:12].clone()).item()
-#     ade_5_second = torch.mean(loss_avg).item()
-#     list_3.append(ade_3_second)
-#     list_5.append(ade_5_second)
-#     print("Ade3: ", statistics.mean(list_3))
-#     print("Ade5: ", statistics.mean(list_5))
-# #np.save("/cluster/scratch/arsood/save_val_result/saveall_2.npy", l_every, allow_pickle=True)
+    list_all_to_ret = model.validate_traj_generate(batch)
+    #print(list_all_to_ret)
+    #list_of_sample_traj_to_ret.append(list_all_to_ret)
+    # for text in list_all_to_ret:
+    #   print(text)
+    #   input_l = input("Cont?")
+    # output_text = model.generate(batch)
+    # print(output_text)
+    # input_l = input("lol")
+    #print(output_text)
+    # # print(batch["front_images"][0].shape)
+    # # print(output_text[0])
+    # for i in range(0, len(batch["front3_camera_image_list"])):
+    #   front3_camera_image_list = batch["front3_camera_image_list"][i]
+    #   front3_camera_calibration_list = batch["front_calib_matrix"][i]
+    #   vehicle_pose = batch["vehicle_pose"][i]
+    #   pred_traj_temp = pred_traj[i]
+    #   next_state_traj_pred = np.stack([pred_traj_temp[...,0], pred_traj_temp[...,1], np.zeros_like(pred_traj_temp[...,0])], axis=1)
+    #   next_state_gt = batch["next_state_traj"][i]
+    #   next_state_gt = np.stack([next_state_gt[...,0], next_state_gt[...,1], np.zeros_like(next_state_gt[...,0])], axis=1)
+    #   for j in range(len(front3_camera_image_list)):
+    #     waypoints_camera_space = project_vehicle_to_image(vehicle_pose, front3_camera_calibration_list[j], next_state_traj_pred)
+    #     waypoints_camera_space_second = project_vehicle_to_image(vehicle_pose, front3_camera_calibration_list[j], next_state_gt)
+    #     front3_camera_image_list[j] = draw_points_on_image(front3_camera_image_list[j], waypoints_camera_space, size=15, colour=(0,255,0))
+    #     front3_camera_image_list[j] = draw_points_on_image(front3_camera_image_list[j], waypoints_camera_space_second, size=15, colour=(0,0,255))
+    #   front_concatenated = np.concatenate(front3_camera_image_list, axis=1)
+    #   list_add = [front_concatenated, output_text[i], batch["index_intent"][i], next_state_gt, next_state_traj_pred]
+    #   l_every.append(list_add)
+    #   plt.figure()
+    #   plt.imshow(front_concatenated)
+    #   plt.savefig("/cluster/home/arsood/Semester_Project_Official/all_fig.png")
+    # ade_3_second = torch.mean(loss_avg[...,0:12].clone()).item()
+    # ade_5_second = torch.mean(loss_avg).item()
+    # list_3.append(ade_3_second)
+    # list_5.append(ade_5_second)
+    # print("Ade3: ", statistics.mean(list_3))
+    # print("Ade5: ", statistics.mean(list_5))
+#np.save("/cluster/scratch/arsood/save_val_result/", list_of_sample_traj_to_ret, allow_pickle=True)
