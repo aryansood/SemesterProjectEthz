@@ -14,16 +14,16 @@ from peft import PeftModel
 import json
 
 class QwenFineTunedModelText(nn.Module):
-    def __init__(self, cache_model = "/cluster/scratch/arsood/models/Qwen2.5-VL-3B-Instruct", local_files_only= True, is_training = True, path_checkpoint = "", device = 'cuda'):
+    def __init__(self, cache_model = "/cluster/scratch/arsood/Qwen_2_5_vlm", local_files_only= True, is_training = True, path_checkpoint = "", device = 'cuda'):
         super(QwenFineTunedModelText, self).__init__()  
 
         self.device = device
 
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            cache_model, dtype=torch.float16, device_map=device) #dtype=torch.float16 torch.bfloat16
+            cache_model, torch_dtype=torch.bfloat16, device_map=device)
 
         self.processor = AutoProcessor.from_pretrained(
-            "/cluster/scratch/arsood/models/Qwen2.5-VL-3B-Instruct"
+            "/cluster/scratch/arsood/Qwen_2_5_vlm"
             )
 
         self.peft_model = self.model
@@ -101,81 +101,55 @@ class QwenFineTunedModelText(nn.Module):
     def validate_traj_generate(self, batch_input, max_new_tokens = 400):
         self.is_training = False
         input_ids = self.prepare_input_for_training(batch_input["messages"], None, batch_input["front_images"])
-        traj_fut_opt = batch_input["rater_traj"]
+        traj_fut_opt = np.array(batch_input["rater_traj"])
         l = 0
         with torch.no_grad():
-            # outputs = self.peft_model.generate(**input_ids, max_new_tokens=max_new_tokens)
-            # generated_ids_trimmed = [
-            # out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids.input_ids, outputs)
-            # ]
-            # output_text = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-            # print(output_text)
-            completions = []
-            for _ in range(1):  # number of completions desired
-                outputs = self.peft_model.generate(
-                    **input_ids,
-                    max_new_tokens=max_new_tokens
-                    # do_sample=True,
-                    # temperature=0.7,
-                    # top_p=0.9
-                )
-                generated_ids_trimmed = [
-                out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids.input_ids, outputs)
-                ]
-                completion = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-                completions.append(completion)
-
-            list_all_to_ret = []
-            for traj_in_rater in traj_fut_opt:
-                l_temp = []
-                l_temp.append(traj_in_rater)
-                list_all_to_ret.append(l_temp)
-            
-            for output in completions:
-                # traj_list_gt = []
-                # traj_list_pred = []
-                # conta = 0
-                l = 0
-                for index_el, el in enumerate(output):
-                    print(el)
-                    input_l = input("ciao?: ")
-                    # clean_string = str(el).strip()
-                    # if clean_string.startswith("```json"):
-                    #     clean_string = clean_string[len("```json"):].strip()
-                    # if clean_string.endswith("```"):
-                    #     clean_string = clean_string[:-3].strip()
-                    # gt_label = json.loads(str(clean_string))
-                    # arr = np.array(gt_label['traj_fut'])
-                    # if(arr.shape[0] == 6):
-                    #     index = [0, 3, 7, 11, 15, 19]
-                    #     cs_x = CubicSpline(index, arr[...,0])
-                    #     cs_y = CubicSpline(index, arr[...,1])
-                    #     t_high = np.arange(0, 20)
-                    #     x_high = cs_x(t_high)[:, None]
-                    #     y_high = cs_y(t_high)[:, None]
-                    #     traj_pred = np.concatenate([x_high, y_high], axis = -1)
-                    #     list_all_to_ret[index_el].append(traj_pred)
-                        
-                        # if(traj_fut_opt[l].shape[0]>=20):
-                        #     traj_list_gt.append(traj_fut_opt[l][0:20])
-                        #     traj_list_pred.append(traj_pred)
-                        # else:
-                        #     conta+=1
-                    # else:
-                    #     traj_list_gt.append(traj_fut_opt[l][0:20])
-                    #     traj_pred = np.zeros((20,2))
-                    #     traj_list_pred.append(traj_pred)
-                    #l += 1
-                # traj_list_gt = torch.from_numpy(np.array(traj_list_gt))
-                # traj_list_pred = torch.from_numpy(np.array(traj_list_pred))
-                # loss_avg = self.loss_validation(traj_list_pred, traj_list_gt)
+            outputs = self.peft_model.generate(**input_ids, max_new_tokens=max_new_tokens)
+            generated_ids_trimmed = [
+            out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids.input_ids, outputs)
+            ]
+            output_text = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+            traj_list_gt = []
+            traj_list_pred = []
+            conta = 0
+            for el in output_text:
+                clean_string = str(el).strip()
+                if clean_string.startswith("```json"):
+                    clean_string = clean_string[len("```json"):].strip()
+                if clean_string.endswith("```"):
+                    clean_string = clean_string[:-3].strip()
+                gt_label = json.loads(str(clean_string))
+                arr = np.array(gt_label['traj_fut'])
+                if(arr.shape[0] == 6):
+                    index = [0, 3, 7, 11, 15, 19]
+                    cs_x = CubicSpline(index, arr[...,0])
+                    cs_y = CubicSpline(index, arr[...,1])
+                    t_high = np.arange(0, 20)
+                    x_high = cs_x(t_high)[:, None]
+                    y_high = cs_y(t_high)[:, None]
+                    traj_pred = np.concatenate([x_high, y_high], axis = -1)
+                    if(traj_fut_opt[l].shape[0]>=20):
+                        traj_list_gt.append(traj_fut_opt[l][0:20])
+                        traj_list_pred.append(traj_pred)
+                    else:
+                        traj_list_gt.append(np.zeros((20,2)))
+                        traj_list_pred.append(traj_pred)
+                        conta+=1
+                else:
+                    traj_list_gt.append(traj_fut_opt[l][0:20])
+                    traj_pred = np.zeros((20,2))
+                    traj_list_pred.append(traj_pred)
+                l += 1
+            traj_list_gt = torch.from_numpy(np.array(traj_list_gt))
+            traj_list_pred = torch.from_numpy(np.array(traj_list_pred))
             # plt.figure()
             # plt.xlim(-20,20)
             # plt.plot(traj_list_gt[0][...,1], traj_list_gt[0][...,0], color='red')
             # plt.plot(traj_list_pred[0][...,1], traj_list_pred[0][...,0], color='blue')
             # plt.savefig("/cluster/home/arsood/Semester_Project_Official/plot.png")
             self.is_training = True
-        return list_all_to_ret#loss_avg, traj_list_pred.numpy()
+            loss_avg = self.loss_validation(traj_list_pred, traj_list_gt)
+        return loss_avg, traj_list_pred.numpy(), output_text
 
     def save(self, path_to_save):
         self.peft_model.save_pretrained(path_to_save, safe_serialization=True)
@@ -189,23 +163,9 @@ class QwenFineTunedModelText(nn.Module):
     def generate(self, batch_input, max_new_tokens = 400):
         self.is_training = False
         input_ids = self.prepare_input_for_training(batch_input["messages"], None, batch_input["front_images"])
-        outputs = self.peft_model.generate(**input_ids, max_new_tokens = max_new_tokens)
+        outputs = self.peft_model.generate(**input_ids, max_new_tokens=max_new_tokens)
         generated_ids_trimmed = [
             out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids.input_ids, outputs)
         ]
         output_text = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        # completions = []
-        # for _ in range(5):  # number of completions desired
-        #     outputs = self.peft_model.generate(
-        #         **input_ids,
-        #         max_new_tokens=max_new_tokens,
-        #         do_sample=True,
-        #         temperature=0.7,
-        #         top_p=0.9
-        #     )
-        #     generated_ids_trimmed = [
-        #     out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids.input_ids, outputs)
-        #     ]
-        #     completion = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        #     completions.append(completion)
-        return output_text
+        return output_text  

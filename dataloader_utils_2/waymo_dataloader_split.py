@@ -8,6 +8,8 @@ import tensorflow as tf
 import cv2
 import matplotlib.pyplot as plt
 from collections import defaultdict
+from .prompt_train import training_prompt_waymo, training_prompt_waymo_direct_traj
+import json
 
 def return_front3_cameras(data: wod_e2ed_pb2.E2EDFrame):
   image_list = []
@@ -128,10 +130,20 @@ class WaymoE2EDatasetTraining(Dataset):
         interval = file_names.index(cur_file)
         
         front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc = return_objects(interval-self.seq_len, interval+1, dir_loc, file_names)
-
+        
         list_time_step = np.arange(0.25 , 5.25, 0.25)
         linear_path_vel_x = (max(0, cur_vel[0])*list_time_step)[:, None]
         linear_path_vel_y = (0*list_time_step)[:, None]
         linear_path_concat = np.concatenate([linear_path_vel_x, linear_path_vel_y], axis = -1)
+        np.set_printoptions(suppress=True)
+        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), np.array_str(np.round(cur_vel, 4)), np.array_str(np.round(cur_acc, 4)))
+        message_to_pass = [{
+        "role": "user",
+        "content": [
+            {"type": "video", "video": ""},
+            {"type": "text", "text": prompt_to_use },
+        ],
+        }
+        ]
 
-        return front_image_list, next_state_traj, past_state_traj, linear_path_concat, num_intent, cur_vel, cur_acc
+        return front_image_list, next_state_traj, past_state_traj, message_to_pass

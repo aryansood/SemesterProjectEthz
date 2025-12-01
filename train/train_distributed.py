@@ -110,11 +110,9 @@ def trainer(
                     loss_avg = validation(model, val_loader, max_step_val = max_val_step)
                 if(loss_avg < best_val_loss):
                     model.module.save(save_val_dest_path)
-                    #torch.save(model.module.dino_traj_decoder.state_dict(), save_val_dest_path)
                     best_val_loss = loss_avg
                 torch.cuda.empty_cache()
-            print("Train: ", loss_scalar)
-            print("Val: ", best_val_loss)
-
-    model.module.save(save_final_dest_path)
-    #torch.save(model.module.dino_traj_decoder.state_dict(), save_final_dest_path)
+            print("Rank: ",rank," Train: ", loss_scalar)
+            print("Rank: ",rank," Val: ", best_val_loss)
+    if(rank == 0):
+        model.module.save(save_final_dest_path)

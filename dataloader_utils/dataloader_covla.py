@@ -94,7 +94,7 @@ def return_objects(start_point, file_path_video, file_path_states):
     return video_array_resize, driving_intent, transform_points_past, transform_points, num_intent, cur_vel, cur_acc
 
 class CovlaDatasetTrainingAnnotated(Dataset):
-    def __init__(self, data_path_videos, data_path_states, seq_len = 4, is_fut_traj = False):
+    def __init__(self, data_path_videos, data_path_states, seq_len = 4, is_fut_traj = False, split_ratio = [0.15, 0.6, 1, 1]):
         super().__init__()
         self.data_path_videos = data_path_videos
         self.list_videos = os.listdir(self.data_path_videos)
@@ -106,7 +106,23 @@ class CovlaDatasetTrainingAnnotated(Dataset):
 
         self.zip_annot_path = "data/covla_annot.zip"
         self.zip_ref_annot = zipfile.ZipFile(self.zip_annot_path, 'r')
-        self.list_annotated_files = [f for f in self.zip_ref_annot.namelist() if not f.endswith('/')]
+
+        data_split_covla = "data/covla_annotated_disjoint_set.npy"
+        covla_split_train = np.load(data_split_covla, allow_pickle=True)
+
+        covla_split_0_1 = random.sample(covla_split_train[0], int(len(covla_split_train[0]) * split_ratio[0]))
+        covla_split_1_2 = random.sample(covla_split_train[1], int(len(covla_split_train[1]) * split_ratio[1]))
+        covla_split_2_3 = random.sample(covla_split_train[2], int(len(covla_split_train[2]) * split_ratio[2]))
+        covla_split_3_4 = random.sample(covla_split_train[3], int(len(covla_split_train[3]) * split_ratio[3]))
+
+        print(len(covla_split_0_1))
+        print(len(covla_split_1_2))
+        print(len(covla_split_2_3))
+        print(len(covla_split_3_4))
+
+        self.list_annotated_files = covla_split_0_1 + covla_split_1_2 + covla_split_2_3 + covla_split_3_4
+
+        #self.list_annotated_files = [f for f in self.zip_ref_annot.namelist() if not f.endswith('/')]
 
         self.seq_len = seq_len
         self.is_fut_traj = is_fut_traj
@@ -143,9 +159,9 @@ class CovlaDatasetTrainingAnnotated(Dataset):
         gt_label = json.loads(str(clean_string))
         if(self.is_fut_traj):
            gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 2).tolist()
+        gt_label["meta_behaviour"].pop("command", None)
         gt_label = json.dumps(gt_label)
-        
-        prompt_to_use = training_prompt_covla(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), np.array_str(np.round(cur_vel, 4)), np.array_str(np.round(cur_acc, 4)))
+        prompt_to_use = training_prompt_covla(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), str(np.round(cur_vel[0], 4)), str(np.round(cur_acc[0], 4)))
         message_to_pass = [{
         "role": "user",
         "content": [

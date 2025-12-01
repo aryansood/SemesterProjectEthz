@@ -114,14 +114,28 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
    
 
 class WaymoE2EDatasetTrainingAnnotated(Dataset):
-    def __init__(self, data_path, seq_len, is_fut_traj = False):
+    def __init__(self, data_path, seq_len, is_fut_traj = False, split_ratio = [0.07, 0.25, 1, 1]):
         super().__init__()
 
         self.data_path = data_path
         self.zip_annot_path = "data/waymo_annot.zip"
 
         self.zip_ref_annot = zipfile.ZipFile(self.zip_annot_path, 'r')
-        self.list_annotated_files = [f for f in self.zip_ref_annot.namelist() if not f.endswith('/')]
+        
+        data_split_waymo = "data/waymo_annotated_disjoint_set.npy"
+        waymo_split_train = np.load(data_split_waymo, allow_pickle=True)
+        waymo_split_0_1 = random.sample(waymo_split_train[0], int(len(waymo_split_train[0])* split_ratio[0]) )
+        waymo_split_1_2 = random.sample(waymo_split_train[1], int(len(waymo_split_train[1])* split_ratio[1]) )
+        waymo_split_2_3 = random.sample(waymo_split_train[2], int(len(waymo_split_train[2])* split_ratio[2]) )
+        waymo_split_3_4 = random.sample(waymo_split_train[3], int(len(waymo_split_train[3])* split_ratio[3]) )
+
+        print(len(waymo_split_0_1))
+        print(len(waymo_split_1_2))
+        print(len(waymo_split_2_3))
+        print(len(waymo_split_3_4))
+
+        self.list_annotated_files = waymo_split_0_1 + waymo_split_1_2 + waymo_split_2_3 + waymo_split_3_4
+        #self.list_annotated_files = [f for f in self.zip_ref_annot.namelist() if not f.endswith('/')]
 
         self.dir_list = os.listdir(data_path)
         
@@ -156,7 +170,7 @@ class WaymoE2EDatasetTrainingAnnotated(Dataset):
             clean_string = clean_string[:-3].strip()
 
         np.set_printoptions(suppress=True)
-        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), np.array_str(np.round(cur_vel, 4)), np.array_str(np.round(cur_acc, 4)))
+        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), str(np.round(cur_vel[0], 4)), str(np.round(cur_acc[0], 4)))
         gt_label = json.loads(str(clean_string))
         if(self.is_fut_traj):
            gt_label["traj_fut"] = np.round(next_state_traj_5[..., 0:2], 2).tolist()
