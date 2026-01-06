@@ -42,14 +42,6 @@ model = PipiLineDinoAdjust()
 trainer(model, train_dataset, 10, 30, train_collate, val_dataset=val_dataset, val_steps= 100, save_val_dest_path = save_val_dest_path, save_final_dest_path = save_final_dest_path, tensor_board_path = tensor_board_path, max_val_step = 24)
 
 
-# dataloader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=train_collate)
-
-# for batch in tqdm(dataloader):
-#     model(batch)
-#     input_l = input("lol?")
-
-
-
 
 
 

@@ -41,6 +41,23 @@ def return_rear3_cameras(data: wod_e2ed_pb2.E2EDFrame):
 
   return image_list, calibration_list
 
+def test_collate(batch):
+  front_image_list =[torch.from_numpy(el[0]).permute(0,3,1,2) for el in batch]
+  front_images_list_no =[torch.from_numpy(el[0]) for el in batch]
+  next_state_traj = [el[1][...,0:2] for el in batch]
+  past_state_traj = [el[2][...,0:2] for el in batch]
+  messages =  [el[3] for el in batch]
+  frame_names = [el[4] for el in batch]
+  batch_dict = {
+        "front_images": front_image_list,
+        "past_state_traj":past_state_traj,
+        "next_state_traj": next_state_traj,
+        "front_images_list_no" : front_images_list_no,
+        "messages" : messages,
+        "frame_names" : frame_names,
+    }
+  return batch_dict
+
 def return_objects(interval_start, interval_end, file_data_path, file_data_names):
 
   past_state_traj = None
@@ -52,6 +69,7 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
   driving_intent = ""
   resize_factor = 5
   num_intent = None
+  frame_name = None
 
   direction_dist = {
      0: "UNKNOWN",
@@ -85,6 +103,7 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
 
           cur_vel = np.stack([data.past_states.vel_x[-1], data.past_states.vel_y[-1]])
           cur_acc = np.stack([data.past_states.accel_x[-1], data.past_states.accel_y[-1]])
+          frame_name = data.frame.context.name
 
           
     
@@ -94,96 +113,35 @@ def return_objects(interval_start, interval_end, file_data_path, file_data_names
   next_state_traj = np.array(next_state_traj)
   past_state_traj = np.array(past_state_traj)
 
-  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc
+  return front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc, frame_name
    
 
-class WaymoE2EDatasetTraining(Dataset):
-    def __init__(self, data_path, seq_len, processor = None, is_Grpo = False, num_generations = 1,split_ratio = [0.1, 0.5, 1, 1]):
+class WaymoE2EDatasetTest(Dataset):
+    def __init__(self, data_path, seq_len):
         super().__init__()
-
         self.data_path = data_path
+        self.dir_list = os.listdir(data_path)
         self.seq_len = seq_len
 
-        waymo_split_train = np.load("dataloader_utils_2/train_data_split/waymo_disjoint_set.npy", allow_pickle=True)
-        print(len(waymo_split_train[0]))
-        print(len(waymo_split_train[1]))
-        print(len(waymo_split_train[2]))
-        print(len(waymo_split_train[3]))
-        waymo_split_0_1 = random.sample(waymo_split_train[0], int(len(waymo_split_train[0])* split_ratio[0]) )
-        waymo_split_1_2 = random.sample(waymo_split_train[1], int(len(waymo_split_train[1])* split_ratio[1]) )
-        waymo_split_2_3 = random.sample(waymo_split_train[2], int(len(waymo_split_train[2])* split_ratio[2]) )
-        waymo_split_3_4 = random.sample(waymo_split_train[3], int(len(waymo_split_train[3])* split_ratio[3]) )
-
-        print(len(waymo_split_0_1))
-        print(len(waymo_split_1_2))
-        print(len(waymo_split_2_3))
-        print(len(waymo_split_3_4))
-
-        self.waymo_data_set = waymo_split_0_1+waymo_split_1_2 + waymo_split_2_3 + waymo_split_3_4
-        # random.shuffle(self.waymo_data_set)
-        waymo_grouped = defaultdict(list)
-        for key in self.waymo_data_set:
-          dir_name , cur_file = os.path.split(key)
-          waymo_grouped[dir_name].append(key)
-        self.waymo_data_set = sorted(list(waymo_grouped.items()))
-        random.shuffle(self.waymo_data_set)
-
-        self.processor = processor
-        self.is_Grpo = is_Grpo
-        self.num_generations = num_generations
-        self.status_arr = [0]*len(self.waymo_data_set)
-        self.random_point_status = [0]*len(self.waymo_data_set)
-
     def __len__(self):
-        return len(self.waymo_data_set)
+        return len(self.dir_list)
     
     def __getitem__(self, index):
-        if(self.status_arr[index] == 0):
-          random_point = random.choice(self.waymo_data_set[index][1])
-          self.random_point_status[index] = random_point
-        else:
-           random_point = self.random_point_status[index]
-        self.status_arr[index] = (self.status_arr[index]+1)%self.num_generations
-        
-        dir_name , cur_file = os.path.split(random_point)
-        dir_loc = os.path.join(self.data_path,dir_name)
+        dir_loc = os.path.join(self.data_path, self.dir_list[index])
         file_names = os.listdir(dir_loc)
         file_names = sorted(file_names)
-        interval = file_names.index(cur_file)
+        interval = len(file_names)-1
+
+        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc, frame_name = return_objects(interval-self.seq_len, interval+1, dir_loc, file_names)
         
-        front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc = return_objects(interval-self.seq_len, interval+1, dir_loc, file_names)
-        
-        indices = [0, 3, 7, 11, 15, 19]
-        next_state_traj_5 = next_state_traj[indices]
-        gt_label = {
-            "traj_fut" : np.round(next_state_traj_5[..., 0:2], 2).tolist()
-        }
-        gt_label = json.dumps(gt_label)
+        np.set_printoptions(suppress=True)
         prompt_to_use = training_prompt_waymo_direct_traj(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), str(np.round(cur_vel[0], 4)), str(np.round(cur_acc[0], 4)))
         message_to_pass = [{
         "role": "user",
         "content": [
-            # {"type": "video", "video": ""},
-            {"type": "image", "image": ""},
+            {"type": "video", "video": ""},
             {"type": "text", "text": prompt_to_use },
         ],
         }
-        # ,{
-        #     "role": "assistant",
-        #     "content": [{"type": "text", "text": gt_label}],
-        # }
         ]
-        
-        #####GRPO
-        if self.is_Grpo:
-          text_prompt = self.processor.apply_chat_template(message_to_pass, tokenize=False, add_generation_prompt= True)
-          image_from_image = torch.from_numpy(front_image_list).permute(0,3,1,2).squeeze(0)
-          dict_to_return = {
-            "prompt" : message_to_pass,
-            "image" : image_from_image,#torch.from_numpy(front_image_list).permute(0,3,1,2),
-            "next_state_traj" : next_state_traj,
-          }
-          return dict_to_return
-        ##########
-
-        return front_image_list, next_state_traj, past_state_traj, message_to_pass
+        return front_image_list, next_state_traj, past_state_traj, message_to_pass, frame_name

@@ -10,6 +10,8 @@ import json
 from waymo_open_dataset.wdl_limited.camera.ops import py_camera_model_ops
 from waymo_open_dataset import dataset_pb2 as open_dataset
 from waymo_open_dataset.protos import end_to_end_driving_data_pb2 as wod_e2ed_pb2
+from .prompt_train import training_prompt_waymo, training_prompt_waymo_direct_traj
+
 
 
 def return_front3_cameras(data: wod_e2ed_pb2.E2EDFrame):
@@ -52,6 +54,8 @@ def collate_val(batch):
   front_calib_matrix = [el[5] for el in batch]
   rater_traj = [el[6] for el in batch]
   rater_traj_score = [el[7] for el in batch]
+  front3_camera_image_list = [el[8] for el in batch]
+  vehicle_pose =  [el[9] for el in batch]
   batch_dict = {
         "messages": messages,
         "front_images": front_images,
@@ -62,6 +66,8 @@ def collate_val(batch):
         "front_calib_matrix" : front_calib_matrix,
         "rater_traj": rater_traj,
         "rater_traj_score": rater_traj_score,
+        "front3_camera_image_list" : front3_camera_image_list,
+        "vehicle_pose" : vehicle_pose,
     }
   return batch_dict
 
@@ -180,5 +186,15 @@ class WaymoE2EDatasetVal(Dataset):
         linear_path_vel_x = (max(0, cur_vel[0])*list_time_step)[:, None]
         linear_path_vel_y = (0*list_time_step)[:, None]
         linear_path_concat = np.concatenate([linear_path_vel_x, linear_path_vel_y], axis = -1)
+        np.set_printoptions(suppress=True)
+        prompt_to_use = training_prompt_waymo(driving_intent, str(np.round(cur_vel[0], 4)), str(np.round(cur_acc[0], 4)))
+        message_to_pass = [{
+        "role": "user",
+        "content": [
+            {"type": "video", "video": ""},
+            {"type": "text", "text": prompt_to_use },
+        ],
+        }
+        ]
 
-        return front_image_list, next_state_traj, past_state_traj, linear_path_concat, num_intent, cur_vel, cur_acc
+        return front_image_list, message_to_pass, past_state_traj, next_state_traj, num_intent, front3_camera_calibration_list, traj_rater, traj_rat_score, front3_camera_image_list, vehicle_pose

@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--dir", type=str, required=True, help="Input directory")
 parser.add_argument("--save", type=str, required=True, help="Output directory")
-parser.add_argument("--type", type=str, help="Choose val or train")
+parser.add_argument("--type", type=str, help="Choose val or train or test")
 
 args = parser.parse_args()
 
@@ -26,6 +26,7 @@ SAVE_LOCATION = args.save #"/cluster/scratch/arsood/data_strings_train"
 
 name_folders_train = np.load('training_segments.npy')
 name_folders_val = np.load('val_segments.npy')
+name_folders_test = np.load('test_segments.npy')
 
 FILES_TYPE = None
 name_folders = None
@@ -37,6 +38,10 @@ if(args.type == 'val'):
 elif(args.type == 'train'):
     FILES_TYPE = TRAIN_FILES
     name_folders = name_folders_train
+
+elif(args.type == 'test'):
+    FILES_TYPE = TEST_FILES
+    name_folders = name_folders_test
 
 filenames = tf.io.matching_files(FILES_TYPE)
 

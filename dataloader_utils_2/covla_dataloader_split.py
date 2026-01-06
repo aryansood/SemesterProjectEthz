@@ -12,6 +12,7 @@ import zipfile
 import av
 from decord import VideoReader, cpu
 from collections import defaultdict
+from .prompt_train import training_prompt_covla_direct_traj
 
 def return_objects(start_point, file_path_video, file_path_states, seq_len):
     resize_factor = 4
@@ -132,8 +133,24 @@ class CovlaDatasetTraining(Dataset):
 
         front_image_list, driving_intent, past_state_traj, next_state_traj, num_intent, cur_vel, cur_acc = return_objects(start_point, file_path_video, file_path_states, self.seq_len)
 
-        list_time_step = np.arange(0.25 , 5.25, 0.25)
-        linear_path_vel_x = (max(0, cur_vel[0])*list_time_step)[:, None]
-        linear_path_vel_y = (0*list_time_step)[:, None]
-        linear_path_concat = np.concatenate([linear_path_vel_x, linear_path_vel_y], axis = -1)
-        return front_image_list, next_state_traj, past_state_traj, linear_path_concat, num_intent, cur_vel, cur_acc
+        indices = [0, 3, 7, 11, 15, 19]
+        next_state_traj_5 = next_state_traj[indices]
+        gt_label = {
+            "traj_fut" : np.round(next_state_traj[..., 0:2], 2).tolist()
+        }
+        gt_label = json.dumps(gt_label)
+        prompt_to_use = training_prompt_covla_direct_traj(str(np.round(cur_vel[0], 4)), str(np.round(cur_acc[0], 4)))
+        message_to_pass = [{
+        "role": "user",
+        "content": [
+            {"type": "video", "video": ""},
+            {"type": "text", "text": prompt_to_use },
+        ],
+        }
+        # ,{
+        #     "role": "assistant",
+        #     "content": [{"type": "text", "text": gt_label}],
+        # }
+        ]
+
+        return front_image_list, next_state_traj, past_state_traj, message_to_pass

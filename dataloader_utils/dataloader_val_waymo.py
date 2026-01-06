@@ -504,7 +504,7 @@ class WaymoE2EDatasetVal(Dataset):
 
         np.set_printoptions(suppress=True)
 
-        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), np.array_str(np.round(cur_vel, 4)), np.array_str(np.round(cur_acc, 4)))
+        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), str(np.round(cur_vel[0], 4)), str(np.round(cur_acc[0], 4)))
         message_to_pass = [{
         "role": "user",
         "content": [

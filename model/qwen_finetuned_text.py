@@ -14,7 +14,7 @@ from peft import PeftModel
 import json
 
 class QwenFineTunedModelText(nn.Module):
-    def __init__(self, cache_model = "/cluster/scratch/arsood/Qwen_2_5_vlm", local_files_only= True, is_training = True, path_checkpoint = "", device = 'cuda'):
+    def __init__(self, cache_model, processor_path, local_files_only= True, is_training = True, path_checkpoint = "", device = 'cuda'):
         super(QwenFineTunedModelText, self).__init__()  
 
         self.device = device
@@ -31,14 +31,8 @@ class QwenFineTunedModelText(nn.Module):
         for param in self.peft_model.parameters():
             param.requires_grad = True
 
-        # for name, param in self.peft_model.named_parameters():
-        #     if param.requires_grad:
-        #         print(f"{name}: requires_grad = {param.requires_grad}")
-
         self.peft_model.to(device)
         self.is_training = is_training
-        # for name, module in self.model.named_modules():
-        #     print(name)
 
     def prepare_input_for_training(self, messages, images, videos):
         
@@ -108,6 +102,7 @@ class QwenFineTunedModelText(nn.Module):
             generated_ids_trimmed = [
             out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids.input_ids, outputs)
             ]
+            print(outputs)
             output_text = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
             traj_list_gt = []
             traj_list_pred = []
@@ -142,14 +137,57 @@ class QwenFineTunedModelText(nn.Module):
                 l += 1
             traj_list_gt = torch.from_numpy(np.array(traj_list_gt))
             traj_list_pred = torch.from_numpy(np.array(traj_list_pred))
-            # plt.figure()
-            # plt.xlim(-20,20)
-            # plt.plot(traj_list_gt[0][...,1], traj_list_gt[0][...,0], color='red')
-            # plt.plot(traj_list_pred[0][...,1], traj_list_pred[0][...,0], color='blue')
-            # plt.savefig("/cluster/home/arsood/Semester_Project_Official/plot.png")
             self.is_training = True
             loss_avg = self.loss_validation(traj_list_pred, traj_list_gt)
         return loss_avg, traj_list_pred.numpy(), output_text
+    
+    def fix_multiple_dots_in_numbers(self, json_str: str) -> str:
+        """
+        Fix numbers like 30.1.06 by keeping the first dot
+        and removing all subsequent dots.
+        """
+        def replacer(match):
+            num = match.group(0)
+            parts = num.split('.')
+            return parts[0] + '.' + ''.join(parts[1:])
+
+        # Match numbers containing more than one dot
+        pattern = r'\d+(?:\.\d+){2,}'
+
+        return re.sub(pattern, replacer, json_str)
+
+    
+    def generate_traj(self, batch_input, max_new_tokens = 400):
+        self.is_training = False
+        input_ids = self.prepare_input_for_training(batch_input["messages"], None, batch_input["front_images"])
+        with torch.no_grad():
+            outputs = self.peft_model.generate(**input_ids, max_new_tokens=max_new_tokens)
+            generated_ids_trimmed = [
+            out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids.input_ids, outputs)
+            ]
+            output_text = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+            traj_list_pred = []
+            # print(output_text)
+            for el in output_text:
+                el = self.fix_multiple_dots_in_numbers(el)
+                clean_string = str(el).strip()
+                if clean_string.startswith("```json"):
+                    clean_string = clean_string[len("```json"):].strip()
+                if clean_string.endswith("```"):
+                    clean_string = clean_string[:-3].strip()
+                gt_label = json.loads(str(clean_string))
+                arr = np.array(gt_label['traj_fut'])
+                index = [0, 3, 7, 11, 15, 19]
+                cs_x = CubicSpline(index, arr[...,0])
+                cs_y = CubicSpline(index, arr[...,1])
+                t_high = np.arange(0, 20)
+                x_high = cs_x(t_high)[:, None]
+                y_high = cs_y(t_high)[:, None]
+                traj_pred = np.concatenate([x_high, y_high], axis = -1)
+                traj_list_pred.append(traj_pred)
+            traj_list_pred = torch.from_numpy(np.array(traj_list_pred))
+            self.is_training = True
+        return traj_list_pred.numpy()
 
     def save(self, path_to_save):
         self.peft_model.save_pretrained(path_to_save, safe_serialization=True)

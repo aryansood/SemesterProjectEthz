@@ -41,10 +41,16 @@ training_data = ConcatDataset([training_waymo_annotated])
 
 train_dataset = training_data#random_split(training_data, [train_size, val_size])
 
-save_val_dest_path = '/cluster/scratch/arsood/Qwen_Fine_Tune_Waymo_Data_Val'
-save_final_dest_path = '/cluster/scratch/arsood/Qwen_Fine_Tune_Waymo_Data_Final'
-tensor_board_path = '/cluster/scratch/arsood/Qwen_Fine_Tune_Waymo_Data_Board'
-model = QwenFineTunedModelText(save_final_dest_path)
+# save_val_dest_path = '/cluster/scratch/arsood/Qwen_Fine_Tune_Waymo_Data_Val'
+# save_final_dest_path = '/cluster/scratch/arsood/Qwen_Fine_Tune_Waymo_Data_Final'
+# tensor_board_path = '/cluster/scratch/arsood/Qwen_Fine_Tune_Waymo_Data_Board'
+# model = QwenFineTunedModelText(save_final_dest_path)
+prcoessor_config = "/cluster/scratch/arsood/Qwen_2_5_vlm"
+#model_to_load = "/cluster/scratch/arsood/Qwen_2_5_vlm"
+model_to_load = "/cluster/scratch/arsood/models/Qwen2.5-3B-GRPO_Train/checkpoint-254"
+
+model = QwenFineTunedModelText(model_to_load, prcoessor_config)
+
 #trainer(model, train_dataset, 2, 2, train_collate, val_dataset=None, val_steps= 100, save_val_dest_path = save_val_dest_path, save_final_dest_path = save_final_dest_path, tensor_board_path = tensor_board_path, max_val_step=30)
 val_dataset = WaymoE2EDatasetVal(data_waymo_val.data, 2)
 val_loader = DataLoader(val_dataset, batch_size=20, shuffle = True, collate_fn = collate_val)
@@ -92,11 +98,6 @@ def draw_points_on_image(image, points, size, colour):
 #     print("Ade5: ", statistics.mean(list_5)) 
 
 
-
-
-
-
-
 l = 0
 sum_3 = 0
 sum_5 = 0
@@ -110,22 +111,22 @@ list_2_3 = []
 list_3_4 = []
 for batch in tqdm(val_loader):
     loss_avg, pred_traj, output_text = model.validate_traj_generate(batch)
-    for i in range(0, len(batch["front3_camera_image_list"])):
-        front3_camera_image_list = batch["front3_camera_image_list"][i]
-        front3_camera_calibration_list = batch["front_calib_matrix"][i]
-        vehicle_pose = batch["vehicle_pose"][i]
-        pred_traj_temp = pred_traj[i]
-        next_state_traj_pred = np.stack([pred_traj_temp[...,0], pred_traj_temp[...,1], np.zeros_like(pred_traj_temp[...,0])], axis=1)
-        next_state_gt = batch["next_state_traj"][i]
-        next_state_gt = np.stack([next_state_gt[...,0], next_state_gt[...,1], np.zeros_like(next_state_gt[...,0])], axis=1)
-        for j in range(len(front3_camera_image_list)):
-            waypoints_camera_space = project_vehicle_to_image(vehicle_pose, front3_camera_calibration_list[j], next_state_traj_pred)
-            waypoints_camera_space_second = project_vehicle_to_image(vehicle_pose, front3_camera_calibration_list[j], next_state_gt)
-            front3_camera_image_list[j] = draw_points_on_image(front3_camera_image_list[j], waypoints_camera_space, size=15, colour=(0,255,0))
-            front3_camera_image_list[j] = draw_points_on_image(front3_camera_image_list[j], waypoints_camera_space_second, size=15, colour=(0,0,255))
-        front_concatenated = np.concatenate(front3_camera_image_list, axis=1)
-        list_add = [front_concatenated, output_text[i], batch["index_intent"][i], next_state_gt, next_state_traj_pred]
-        l_every.append(list_add)
+    # for i in range(0, len(batch["front3_camera_image_list"])):
+    #     front3_camera_image_list = batch["front3_camera_image_list"][i]
+    #     front3_camera_calibration_list = batch["front_calib_matrix"][i]
+    #     vehicle_pose = batch["vehicle_pose"][i]
+    #     pred_traj_temp = pred_traj[i]
+    #     next_state_traj_pred = np.stack([pred_traj_temp[...,0], pred_traj_temp[...,1], np.zeros_like(pred_traj_temp[...,0])], axis=1)
+    #     next_state_gt = batch["next_state_traj"][i]
+    #     next_state_gt = np.stack([next_state_gt[...,0], next_state_gt[...,1], np.zeros_like(next_state_gt[...,0])], axis=1)
+    #     for j in range(len(front3_camera_image_list)):
+    #         waypoints_camera_space = project_vehicle_to_image(vehicle_pose, front3_camera_calibration_list[j], next_state_traj_pred)
+    #         waypoints_camera_space_second = project_vehicle_to_image(vehicle_pose, front3_camera_calibration_list[j], next_state_gt)
+    #         front3_camera_image_list[j] = draw_points_on_image(front3_camera_image_list[j], waypoints_camera_space, size=15, colour=(0,255,0))
+    #         front3_camera_image_list[j] = draw_points_on_image(front3_camera_image_list[j], waypoints_camera_space_second, size=15, colour=(0,0,255))
+    #     front_concatenated = np.concatenate(front3_camera_image_list, axis=1)
+    #     list_add = [front_concatenated, output_text[i], batch["index_intent"][i], next_state_gt, next_state_traj_pred]
+    #     l_every.append(list_add)
     
     ade_3_second = torch.mean(loss_avg[...,0:12].clone()).item()
     ade_5_second = torch.mean(loss_avg).item()
@@ -133,4 +134,4 @@ for batch in tqdm(val_loader):
     list_5.append(ade_5_second)
     print("Ade3: ", statistics.mean(list_3))
     print("Ade5: ", statistics.mean(list_5))
-np.save("/cluster/scratch/arsood/save_val_result/qwen_val.npy", l_every, allow_pickle=True)
+# np.save("/cluster/scratch/arsood/save_val_result/qwen_val.npy", l_every, allow_pickle=True)

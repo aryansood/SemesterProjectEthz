@@ -1,4 +1,4 @@
-def training_prompt_waymo(intent, traj_past, cur_vel, cur_acc):
+def training_prompt_waymo(intent, cur_vel, cur_acc):
     #- 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
     prompt_to_pass = """
     You are an expert driver.
@@ -158,36 +158,39 @@ def training_prompt_covla(intent, traj_past, cur_vel, cur_acc):
     return prompt_to_pass
 
 
-def training_prompt_covla_direct_traj(intent, traj_past):
+def training_prompt_covla_direct_traj(cur_vel, cur_acc):
     prompt_to_pass = """
     You are an expert left-hand-side driver.
     Input:
     - 4 frames of front-view images images collected from the ego-vehicle over the last second
-    - Current high-level intent """+intent+"""
-    - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
+    - Current velocity: """+cur_vel+"""
+    - Current acceleration: """+cur_acc+"""    
     Task: Future Trajectory Prediction
     Given the input, intent and past trajectory,
-    predict the optimal 5-second future trajectory (6 steps at 1 Hz, the first point rappresent second 0.25) of the ego vehicle.
+    predict the optimal 5-second future trajectory (20 steps at 4 Hz, the first point rappresent second 0.25) of the ego vehicle.
     Output format Json as follows(raw text, not markdown or LaTeX):
     {
-    "traj_fut": [[x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5], [x_6, y_6]]
+    "traj_fut": [[x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5], [x_6, y_6], ..., [x_20, y_20]]
     }
     """
     return prompt_to_pass
 
-def training_prompt_waymo_direct_traj(intent, traj_past):
+def training_prompt_waymo_direct_traj(intent, past_traj, cur_vel, cur_acc):
     prompt_to_pass = """
     You are an expert driver.
     Input:
     - 4 frames of multi-view images images collected from the ego-vehicle over the last second
     - Current high-level intent """+intent+"""
-    - 4-second past trajectory (16 steps at 4 Hz)"""+traj_past+"""
+    - Current velocity: """+cur_vel+"""
+    - Current acceleration: """+cur_acc+"""
     Task: Future Trajectory Prediction
     Given the input, intent and past trajectory,
-    predict the optimal 5-second future trajectory (6 steps at 1 Hz, the first point rappresent second 0.25) of the ego vehicle.
+    predict the optimal 5-second future trajectory (19 steps at 4 Hz, the first point rappresent second 0.25) of the ego vehicle.
     Output format Json as follows(raw text, not markdown or LaTeX):
     {
-    "traj_fut": [[x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5], [x_6, y_6]]
+    "traj_fut": [[x_1, y_1], [x_2, y_2], [x_3, y_3], [x_4, y_4], [x_5, y_5], [x_6, y_6], ..., [x_19, y_19]]
     }
     """
     return prompt_to_pass
+
+# "    - Current high-level intent """+intent+"""
