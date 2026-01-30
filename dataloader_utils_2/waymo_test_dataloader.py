@@ -135,7 +135,7 @@ class WaymoE2EDatasetTest(Dataset):
         front_image_list, rear_image_list, next_state_traj, past_state_traj, driving_intent, num_intent, cur_vel, cur_acc, frame_name = return_objects(interval-self.seq_len, interval+1, dir_loc, file_names)
         
         np.set_printoptions(suppress=True)
-        prompt_to_use = training_prompt_waymo_direct_traj(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), str(np.round(cur_vel[0], 4)), str(np.round(cur_acc[0], 4)))
+        prompt_to_use = training_prompt_waymo(driving_intent, np.array_str(np.round(past_state_traj[..., 0:2], 1)), str(np.round(cur_vel, 4)), str(np.round(cur_acc, 4)))
         message_to_pass = [{
         "role": "user",
         "content": [

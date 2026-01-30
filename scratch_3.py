@@ -19,7 +19,8 @@ prcoessor_config = "/cluster/scratch/arsood/Qwen_2_5_vlm"
 #model_to_load = "/cluster/scratch/arsood/Qwen_2_5_vlm"
 # model_to_load = "/cluster/scratch/arsood/models/Qwen2.5-3B-GRPO_Train/checkpoint-254"
 # model_to_load = "/cluster/scratch/arsood/models/Qwen2.5-3B-GRPO_Train_past_traj_2/checkpoint-508"
-model_to_load = "/cluster/scratch/arsood/models/Qwen2.5-3B-GRPO_Vel_Acc_2/checkpoint-1018"
+# model_to_load = "/cluster/scratch/arsood/models/Qwen2.5-3B-GRPO_Vel_Acc_2/checkpoint-1018"
+model_to_load = "/cluster/scratch/arsood/models/Qwen2.5-3B-GRPO_Full_Traj_3/checkpoint-4074"
 
 model = QwenFineTunedModelText(model_to_load, prcoessor_config)
 
@@ -36,7 +37,7 @@ for batch in tqdm(waymo_dataloader):
 
 
 num_submission_shards = len(predictions)
-submission_file_base = '/cluster/scratch/arsood/submit_grpo_better'
+submission_file_base = '/cluster/scratch/arsood/submit_grpo_full_traj'
 if not os.path.exists(submission_file_base):
   os.makedirs(submission_file_base)
 sub_file_names = [
@@ -58,7 +59,7 @@ for i, shard in enumerate(submissions):
   shard.authors[:] = ['Aryan', 'Sood']  # Please modify accordingly.
   shard.affiliation = 'ETHZurich'  # Please modify accordingly.
   shard.account_name = 'soodaryan972@gmail.com'  # Please modify accordingly.
-  shard.unique_method_name = 'Vlm-GRPO-Wcot'  # Please modify accordingly.
+  shard.unique_method_name = 'VLM-GRPO-FULL-TRAJ'  # Please modify accordingly.
   shard.method_link = 'method_link'  # Please modify accordingly.
   shard.description = ''  # Please modify accordingly.
   shard.uses_public_model_pretraining = True # Please modify accordingly.

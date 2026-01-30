@@ -187,7 +187,7 @@ class WaymoE2EDatasetVal(Dataset):
         linear_path_vel_y = (0*list_time_step)[:, None]
         linear_path_concat = np.concatenate([linear_path_vel_x, linear_path_vel_y], axis = -1)
         np.set_printoptions(suppress=True)
-        prompt_to_use = training_prompt_waymo(driving_intent, str(np.round(cur_vel[0], 4)), str(np.round(cur_acc[0], 4)))
+        prompt_to_use = training_prompt_waymo_direct_traj(driving_intent, str(np.round(cur_vel, 4)), str(np.round(cur_acc, 4)))
         message_to_pass = [{
         "role": "user",
         "content": [

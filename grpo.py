@@ -93,11 +93,11 @@ processor = AutoProcessor.from_pretrained(
             processor_config
             )
 
-num_generations = 8
-per_device_train_batch_size = 8
+num_generations = 4
+per_device_train_batch_size = 4
 data_set_grpo = WaymoE2EDatasetTraining(data_waymo_train.data, 1, processor, is_Grpo = True, num_generations = num_generations)
 
-output_dir = "/cluster/scratch/arsood/models/Qwen2.5-3B-GRPO_Full_Traj"
+output_dir = "/cluster/scratch/arsood/models/Qwen2.5-3B-GRPO_Full_Traj_3"
 
 for param in model.parameters():
     param.requires_grad = True
@@ -112,7 +112,7 @@ training_args = GRPOConfig(
     fp16=True,
     output_dir=output_dir,                        
     logging_steps=1,
-    temperature = 0.7,
+    temperature = 0.8,
     top_p=0.9,
     save_strategy="steps",
     save_steps=250,

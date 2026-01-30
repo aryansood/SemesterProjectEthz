@@ -60,7 +60,7 @@ for i, shard in enumerate(submissions):
   shard.authors[:] = ['Aryan', 'Sood']  # Please modify accordingly.
   shard.affiliation = 'ETHZurich'  # Please modify accordingly.
   shard.account_name = 'soodaryan972@gmail.com'  # Please modify accordingly.
-  shard.unique_method_name = 'Vlm-latent-cot'  # Please modify accordingly.
+  shard.unique_method_name = 'VLM-GRPO-FULL-TRAJ'  # Please modify accordingly.
   shard.method_link = 'method_link'  # Please modify accordingly.
   shard.description = ''  # Please modify accordingly.
   shard.uses_public_model_pretraining = True # Please modify accordingly.

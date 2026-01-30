@@ -44,7 +44,7 @@ def validate_proj_save(val_loader, model, path_to_save):
     os.makedirs(os.path.dirname(path_to_save), exist_ok=True)
     list_to_save_all = []
     for batch in tqdm(val_loader):
-        loss_avg, pred_traj = model.validate(batch)
+        loss_avg, pred_traj = model.generate_traj_val(batch)
         for i in range(0, len(batch["front3_camera_image_list"])):
             front3_camera_image_list = batch["front3_camera_image_list"][i]
             front3_camera_calibration_list = batch["front_calib_matrix"][i]

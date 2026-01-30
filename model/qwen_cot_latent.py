@@ -86,7 +86,7 @@ class QwenLatentCot(nn.Module):
         loss_diff = torch.sqrt(torch.square(pred-target).sum(dim = -1))
         return loss_diff
 
-    def validate(self, x):
+    def generate_traj_val(self, x):
         batch = self.prepare_input_for_training(x["messages"], None, x["front_images"])
         target = torch.tensor(np.array(x["next_state_traj"])).to(self.device)
         # index = [0, 3, 7, 11, 15, 19]
@@ -114,7 +114,7 @@ class QwenLatentCot(nn.Module):
             pred_arr_20_hz = torch.from_numpy(pred_arr_20_hz)
             pred_arr_20_hz = pred_arr_20_hz.to(self.device)
             loss_to_return = self.loss_validation(pred_arr_20_hz, target)
-        return loss_to_return#, pred_arr_20_hz.detach().cpu().numpy()
+        return loss_to_return, pred_arr_20_hz.detach().cpu().numpy()
     
     def generate_trajectory(self, x):
         batch = self.prepare_input_for_training(x["messages"], None, x["front_images"])

@@ -95,7 +95,7 @@ class QwenFineTunedModelText(nn.Module):
     def validate_traj_generate(self, batch_input, max_new_tokens = 400):
         self.is_training = False
         input_ids = self.prepare_input_for_training(batch_input["messages"], None, batch_input["front_images"])
-        traj_fut_opt = np.array(batch_input["rater_traj"])
+        traj_fut_opt = np.array(batch_input["next_state_traj"])
         l = 0
         with torch.no_grad():
             outputs = self.peft_model.generate(**input_ids, max_new_tokens=max_new_tokens)
@@ -157,9 +157,10 @@ class QwenFineTunedModelText(nn.Module):
         return re.sub(pattern, replacer, json_str)
 
     
-    def generate_traj(self, batch_input, max_new_tokens = 400):
+    def generate_traj_val(self, batch_input, max_new_tokens = 400):
         self.is_training = False
         input_ids = self.prepare_input_for_training(batch_input["messages"], None, batch_input["front_images"])
+        traj_fut_opt = np.array(batch_input["next_state_traj"])
         with torch.no_grad():
             outputs = self.peft_model.generate(**input_ids, max_new_tokens=max_new_tokens)
             generated_ids_trimmed = [
@@ -169,6 +170,7 @@ class QwenFineTunedModelText(nn.Module):
             traj_list_pred = []
             # print(output_text)
             for el in output_text:
+                print(el)
                 el = self.fix_multiple_dots_in_numbers(el)
                 clean_string = str(el).strip()
                 if clean_string.startswith("```json"):
@@ -177,7 +179,11 @@ class QwenFineTunedModelText(nn.Module):
                     clean_string = clean_string[:-3].strip()
                 gt_label = json.loads(str(clean_string))
                 arr = np.array(gt_label['traj_fut'])
-                index = [0, 3, 7, 11, 15, 19]
+                index = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19]
+                if(arr.shape[0] == 20):
+                    index = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+                if(arr.shape[0] == 18):
+                    index = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19]
                 cs_x = CubicSpline(index, arr[...,0])
                 cs_y = CubicSpline(index, arr[...,1])
                 t_high = np.arange(0, 20)
@@ -186,8 +192,10 @@ class QwenFineTunedModelText(nn.Module):
                 traj_pred = np.concatenate([x_high, y_high], axis = -1)
                 traj_list_pred.append(traj_pred)
             traj_list_pred = torch.from_numpy(np.array(traj_list_pred))
+            traj_fut_opt = torch.from_numpy(np.array(traj_fut_opt))
             self.is_training = True
-        return traj_list_pred.numpy()
+            loss_avg = self.loss_validation(traj_list_pred, traj_fut_opt)
+        return loss_avg, traj_list_pred.numpy()
 
     def save(self, path_to_save):
         self.peft_model.save_pretrained(path_to_save, safe_serialization=True)
