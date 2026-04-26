@@ -11,3 +11,4 @@ pip install waymo-open-dataset-tf-2-12-0==1.6.7
 pip install -r requirements.txt
 ```
 ---
+[View Final Report](Final_Report_Aryan_Sood-1.pdf)
